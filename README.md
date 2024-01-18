@@ -11,11 +11,10 @@ the system cannot supply more information than just their number).
 
 Here are some examples of expressions you can type:
 
-        hi              --> no result (you just referenced a variable)
-        (hi)            --> you are greeted from a primitive function
-        (hi print)      --> you get the integer value of 'hi'
-        (hi 42 print)   --> print variable number of args
-        ((1 2 +) print) --> nested expression support
+        hi or (hi)      --> you are greeted from a primitive function
+        hi print        --> you get the integer value of 'hi'
+        hi 42 print     --> print variable number of args
+        (1 2 +) print   --> nested expression support
 
 This demonstrates the preliminary framework for variables, (primitive)
 functions and their evaluation.

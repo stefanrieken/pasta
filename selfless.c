@@ -117,9 +117,9 @@ uint16_t add_primitive(uint16_t prim) {
 bool is_whitespace_char(int ch) {
     return ch == ' ' || ch == '\t' || ch == '\r' || ch == '\n';
 }
-int next_non_whitespace_char() {
+int next_non_whitespace_char(int until) {
     int ch = getchar();
-    while (is_whitespace_char(ch)) ch = getchar();
+    while (ch != until && is_whitespace_char(ch)) ch = getchar();
     return ch;
 }
 
@@ -136,7 +136,10 @@ void run_postfixed() {
 
      printf("\n\nREADY.\n> ");
 
-    int ch = next_non_whitespace_char();
+    // allow for top-level statements without brackets
+    bopen(&countstack);
+    int ch = next_non_whitespace_char('\n');
+
     while (ch != EOF) {
         if (ch >='0' && ch <= '9') {
             // printf("Parsing int\n");
@@ -151,17 +154,20 @@ void run_postfixed() {
             printf("Todo parse string\n");
         } else if (ch == '(') {
             bopen(&countstack);
-        } else if (ch == ')') {
-            uint16_t func = pop(&argstack);
-            uint16_t num_args = bclose(&countstack)-1;
-            //printf("Running func %d with %d args\n", func, num_args);
-            run_func(func, num_args);
+        } else if (ch == ')' || (countstack.length == 1 && ch == '\n')) {
+            if (argstack.length > 0) {
+                uint16_t func = pop(&argstack);
+                uint16_t num_args = bclose(&countstack)-1;
+                //printf("Running func %d with %d args\n", func, num_args);
+                run_func(func, num_args);
             
-            if(countstack.length == 0) {
-                // printf("Cleaning argstack\n");
-                argstack.length = 0;
-                printf("> ");
-            }
+                if(countstack.length == 0) {
+                    // printf("Cleaning argstack\n");
+                    argstack.length = 0;
+                    printf("> ");
+                    if (ch == '\n') bopen(&countstack); // for bracketless
+                }
+            } else if (ch == ')') printf("Bracket mismatch!\n");
         } else {
             // printf("Label\n");
             int i=0;
@@ -169,10 +175,10 @@ void run_postfixed() {
             buffer[i++] = 0;
             push(&argstack, lookup_variable(unique_string(buffer)));
             count(&countstack);
-            if (!is_whitespace_char(ch)) continue; // so that superfluous 'ch' is processed in next round
+            if (!is_whitespace_char(ch) || (countstack.length == 1 && ch == '\n')) continue; // so that superfluous 'ch' is processed in next round
         }
 
-        ch = next_non_whitespace_char();
+        ch = next_non_whitespace_char('\n');
     }
 }
 
