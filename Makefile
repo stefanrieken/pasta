@@ -1,2 +1,2 @@
 all:
-	gcc -Os selfless.c -o selfless
+	gcc -Os stack.c selfless.c -o selfless

@@ -4,6 +4,8 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+#include "stack.h"
+
 char * memory;
 
 #define MAX_MEM (64 * 1024)
@@ -23,16 +25,17 @@ int code_end;
 int vars_end;
 
 // Primitive defs
+#define PRIM_PLUS 41
 #define PRIM_HELLO 42
 #define PRIM_PRINT 43
 
 typedef struct Variable {
     uint16_t name;
-    uint16_t value; // TODO assume all types' values fit in 16 bits?
+    uint16_t value; // TODO do we assume all types' values fit in 16 bits?
 } Variable;
 
-uint16_t argstack[256];
-int num_args = 0; // TODO this should be a bracket counting stack value
+Stack argstack;
+Stack countstack;
 
 /** 
  * Find string in unique string list, or add it.
@@ -45,7 +48,7 @@ uint16_t unique_string(char * string) {
         i += memory[STRING_START+i]; // follow chain
         if(i >= MAX_STRING) { printf("String overflow!\n"); return 0; }
     }
-    printf("Adding new string '%s' at pos %d\n", string, i);
+    // printf("Adding new string '%s' at pos %d\n", string, i);
 
     int len = strlen(string) + 1; // include 0 at end
     memory[STRING_START+i] = len+1; // = skip count
@@ -79,18 +82,23 @@ uint16_t lookup_variable(uint16_t name) {
     return 0;
 }
 
-void run_func(uint16_t func) {
+void run_func(uint16_t func, uint16_t num_args) {
     uint8_t type = memory[func];
 
     if (type == 0) {
         uint8_t prim = memory[func+1];
         switch(prim) {
+            case PRIM_PLUS:
+                push(&argstack, pop(&argstack) + pop(&argstack));
+                count(&countstack);
+                break;
             case PRIM_PRINT:
-              printf("My arg is: %d\n", argstack[num_args-1]); num_args--;
-              break;
+                for(int i=0;i<num_args;i++) { printf("%d ", pop(&argstack)); }
+                printf("\n");
+                break;
             default:
-              printf("Hello from primitive #%d\n", prim);
-              break;
+                printf("Hello from primitive #%d\n", prim);
+                break;
         }
     } else {
         printf("TODO: interpret native code.\n");
@@ -119,11 +127,14 @@ int next_non_whitespace_char() {
  * Parse and run postfixed code on-the-fly.
  * This is not the end goal (which is to compile (prefixed) code),
  * but makes for a quick proof-of-concept.
+ *
+ * Biggest limitiation: in-line blocks basically require compiled code,
+ * as we have to be able to execute code parsed before.
  */
 void run_postfixed() {
     char buffer[256];
 
-    num_args = 0;
+     printf("\n\nREADY.\n> ");
 
     int ch = next_non_whitespace_char();
     while (ch != EOF) {
@@ -134,21 +145,30 @@ void run_postfixed() {
                 result = (result * 10) + (ch-'0');
                 ch = getchar();
             } while(ch >= '0' && ch <= '9');
-            argstack[num_args++] = result;
+            push(&argstack, result);
+            count(&countstack);
         } else if (ch=='\"') {
             printf("Todo parse string\n");
         } else if (ch == '(') {
-            num_args = 0;
+            bopen(&countstack);
         } else if (ch == ')') {
-            uint16_t func = argstack[num_args-1]; num_args--;
-            printf("Running func %d with %d args\n", func, num_args);
-            run_func(func);
+            uint16_t func = pop(&argstack);
+            uint16_t num_args = bclose(&countstack)-1;
+            //printf("Running func %d with %d args\n", func, num_args);
+            run_func(func, num_args);
+            
+            if(countstack.length == 0) {
+                // printf("Cleaning argstack\n");
+                argstack.length = 0;
+                printf("> ");
+            }
         } else {
             // printf("Label\n");
             int i=0;
             while (!is_whitespace_char(ch) && ch != '(' && ch != ')') { buffer[i++] = ch; ch = getchar(); }
             buffer[i++] = 0;
-            argstack[num_args++] = lookup_variable(unique_string(buffer));
+            push(&argstack, lookup_variable(unique_string(buffer)));
+            count(&countstack);
             if (!is_whitespace_char(ch)) continue; // so that superfluous 'ch' is processed in next round
         }
 
@@ -163,22 +183,28 @@ int main (int argc, char ** argv) {
     vars_end = VARS_START;
     code_end = CODE_START;
 
+    argstack.length = 0;
+    argstack.size = 256;
+    argstack.values = malloc(256);
+
+    countstack.length = 0;
+    countstack.size = 256;
+    countstack.values = malloc(256);
+
     // test program
-    unique_string("+");
-    unique_string("define");
-    unique_string("+");
-    add_variable("yay", 42);
+    unique_string("+"); // test (de)duplication of strings
+    add_variable("+", add_primitive(PRIM_PLUS));
     add_variable("hi", add_primitive(PRIM_HELLO));
     add_variable("print", add_primitive(PRIM_PRINT));
 
-    printf("Known strings:\n");
+    printf("Known strings:");
     int i = STRING_START;
-    while(memory[i] != 0) { printf("  %s\n", &memory[i+1]); i += memory[i]; }
-    printf("Known variables:\n");
+    while(memory[i] != 0) { printf(" %s", &memory[i+1]); i += memory[i]; }
+    printf("\nKnown variables:");
     i = VARS_START;
     while(i < vars_end) {
         Variable * var = (Variable *) &memory[i];
-        printf("  %s: %d\n", str(var->name), var->value);
+        printf(" %s (%d)", str(var->name), var->value);
         i += sizeof(Variable);
     }
 

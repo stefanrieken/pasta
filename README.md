@@ -3,22 +3,21 @@ Selfless is a retroprogramming language, sprinkling a few Selfish novelties
 over an otherwise quite achaic LISP dialect.
 
 ## Current state
-...is 'initial'.
+...is 'work in progress'.
 
 Upon execution, known strings and variables are listed. Of these variables,
-'hi' and 'print' indicate primitive functions (variables are untyped, so the
-system cannot supply more information than just their number).
+'+', 'hi' and 'print' indicate primitive functions (variables are untyped, so
+the system cannot supply more information than just their number).
 
-Type 'hi', and nothing much happens. You have just referenced a variable.
+Here are some examples of expressions you can type:
 
-Type '(hi)', and you get a greeting; you have evaluated a primitive function.
+        hi              --> no result (you just referenced a variable)
+        (hi)            --> you are greeted from a primitive function
+        (hi print)      --> you get the integer value of 'hi'
+        (hi 42 print)   --> print variable number of args
+        ((1 2 +) print) --> nested expression support
 
-Type '(hi print)', and you see the evaluation of the integer-printing function
-with as its argument the integer value of 'hi'. You can also print an integer
-literal: '(42 print)'. Notice that the current interpreter is fully postfixed.
-
-Many, many shortcuts have been taken to allow for this interpretation to work;
-nevertheless they represent a preliminary framework for variables, (primitive)
+This demonstrates the preliminary framework for variables, (primitive)
 functions and their evaluation.
 
 What follows below is design, not current state.
