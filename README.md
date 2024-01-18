@@ -15,6 +15,7 @@ Here are some examples of expressions you can type:
         hi print        --> you get the integer value of 'hi'
         hi 42 print     --> print variable number of args
         (1 2 +) print   --> nested expression support
+        42              --> will try to evaluate value as function(!)
 
 This demonstrates the preliminary framework for variables, (primitive)
 functions and their evaluation.

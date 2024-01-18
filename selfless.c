@@ -28,6 +28,7 @@ int vars_end;
 #define PRIM_PLUS 41
 #define PRIM_HELLO 42
 #define PRIM_PRINT 43
+#define PRIM_LS 44
 
 typedef struct Variable {
     uint16_t name;
@@ -82,6 +83,17 @@ uint16_t lookup_variable(uint16_t name) {
     return 0;
 }
 
+void ls() {
+    printf("Known variables:");
+    int i = VARS_START;
+    while(i < vars_end) {
+        Variable * var = (Variable *) &memory[i];
+        printf(" %s (%d)", str(var->name), var->value);
+        i += sizeof(Variable);
+    }
+    printf("\n");
+}
+
 void run_func(uint16_t func, uint16_t num_args) {
     uint8_t type = memory[func];
 
@@ -90,11 +102,14 @@ void run_func(uint16_t func, uint16_t num_args) {
         switch(prim) {
             case PRIM_PLUS:
                 push(&argstack, pop(&argstack) + pop(&argstack));
-                count(&countstack);
+                count(&countstack, 1);
                 break;
             case PRIM_PRINT:
                 for(int i=0;i<num_args;i++) { printf("%d ", pop(&argstack)); }
                 printf("\n");
+                break;
+            case PRIM_LS:
+                ls();
                 break;
             default:
                 printf("Hello from primitive #%d\n", prim);
@@ -134,7 +149,7 @@ int next_non_whitespace_char(int until) {
 void run_postfixed() {
     char buffer[256];
 
-     printf("\n\nREADY.\n> ");
+     printf("\nREADY.\n> ");
 
     // allow for top-level statements without brackets
     bopen(&countstack);
@@ -149,7 +164,8 @@ void run_postfixed() {
                 ch = getchar();
             } while(ch >= '0' && ch <= '9');
             push(&argstack, result);
-            count(&countstack);
+            count(&countstack, 1);
+            if (!is_whitespace_char(ch) || (countstack.length == 1 && ch == '\n')) continue; // so that superfluous 'ch' is processed in next round
         } else if (ch=='\"') {
             printf("Todo parse string\n");
         } else if (ch == '(') {
@@ -158,23 +174,24 @@ void run_postfixed() {
             if (argstack.length > 0) {
                 uint16_t func = pop(&argstack);
                 uint16_t num_args = bclose(&countstack)-1;
+                    if (ch == '\n') bopen(&countstack); // for bracketless
                 //printf("Running func %d with %d args\n", func, num_args);
                 run_func(func, num_args);
-            
-                if(countstack.length == 0) {
+            } else if (ch == ')') printf("Bracket mismatch!\n");
+
+                if(countstack.length == 1 && ch == '\n') {
                     // printf("Cleaning argstack\n");
                     argstack.length = 0;
                     printf("> ");
-                    if (ch == '\n') bopen(&countstack); // for bracketless
                 }
-            } else if (ch == ')') printf("Bracket mismatch!\n");
+
         } else {
             // printf("Label\n");
             int i=0;
             while (!is_whitespace_char(ch) && ch != '(' && ch != ')') { buffer[i++] = ch; ch = getchar(); }
             buffer[i++] = 0;
             push(&argstack, lookup_variable(unique_string(buffer)));
-            count(&countstack);
+            count(&countstack, 1);
             if (!is_whitespace_char(ch) || (countstack.length == 1 && ch == '\n')) continue; // so that superfluous 'ch' is processed in next round
         }
 
@@ -202,17 +219,13 @@ int main (int argc, char ** argv) {
     add_variable("+", add_primitive(PRIM_PLUS));
     add_variable("hi", add_primitive(PRIM_HELLO));
     add_variable("print", add_primitive(PRIM_PRINT));
+    add_variable("ls", add_primitive(PRIM_LS));
 
     printf("Known strings:");
     int i = STRING_START;
     while(memory[i] != 0) { printf(" %s", &memory[i+1]); i += memory[i]; }
-    printf("\nKnown variables:");
-    i = VARS_START;
-    while(i < vars_end) {
-        Variable * var = (Variable *) &memory[i];
-        printf(" %s (%d)", str(var->name), var->value);
-        i += sizeof(Variable);
-    }
+    printf("\n");
 
+    ls();
     run_postfixed();
 }
