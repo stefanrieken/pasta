@@ -19,6 +19,11 @@ void push(Stack * stack, uint16_t value) {
     stack->length++;
 }
 
+uint16_t peek(Stack * stack) {
+    if(stack->length == 0) { printf("Empty stack!\n"); return 0; }
+    return stack->values[stack->length-1];
+}
+
 // Bracket counting uses the stack differently:
 void bopen(Stack * stack) {
     if(stack->length >= stack->size) { printf("Stack overflow!\n"); return; }
@@ -33,6 +38,6 @@ uint16_t bclose(Stack * stack) {
 }
 
 void count(Stack * stack, int num) {
-    if(stack->length > 0)
-      stack->values[stack->length-1] += num;
+    if(stack->length == 0) { printf("Empty stack!\n"); return; }
+    stack->values[stack->length-1] += num;
 }

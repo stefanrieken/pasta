@@ -35,9 +35,6 @@ typedef struct Variable {
     uint16_t value; // TODO do we assume all types' values fit in 16 bits?
 } Variable;
 
-Stack argstack;
-Stack countstack;
-
 /** 
  * Find string in unique string list, or add it.
  * @return relative pointer to string
@@ -94,31 +91,6 @@ void ls() {
     printf("\n");
 }
 
-void run_func(uint16_t func, uint16_t num_args) {
-    uint8_t type = memory[func];
-
-    if (type == 0) {
-        uint8_t prim = memory[func+1];
-        switch(prim) {
-            case PRIM_PLUS:
-                push(&argstack, pop(&argstack) + pop(&argstack));
-                count(&countstack, 1);
-                break;
-            case PRIM_PRINT:
-                for(int i=0;i<num_args;i++) { printf("%d ", pop(&argstack)); }
-                printf("\n");
-                break;
-            case PRIM_LS:
-                ls();
-                break;
-            default:
-                printf("Hello from primitive #%d\n", prim);
-                break;
-        }
-    } else {
-        printf("TODO: interpret native code.\n");
-    }
-}
 
 uint16_t add_primitive(uint16_t prim) {
     //printf("Add prim %d at %d\n", prim, code_end);
@@ -138,15 +110,113 @@ int next_non_whitespace_char(int until) {
     return ch;
 }
 
-/**
- * Parse and run postfixed code on-the-fly.
- * This is not the end goal (which is to compile (prefixed) code),
- * but makes for a quick proof-of-concept.
- *
- * Biggest limitiation: in-line blocks basically require compiled code,
- * as we have to be able to execute code parsed before.
- */
-void run_postfixed() {
+#define CMD_EVAL 0b00
+#define CMD_PUSH 0b01
+#define CMD_REF  0b10
+#define CMD_SKIP 0b11
+
+#define BYTE_FOLLOWS 0b111101
+#define WORD_FOLLOWS 0b111110
+#define LONG_FOLLOWS 0b111111
+
+int add_command(unsigned char cmd, uint32_t value, unsigned char * code, int code_idx) {
+    if (value > 59) {
+        // Can't encode within 2^6 - 4
+        // encode as 'word follows' (for now always 16-bit
+        code[code_idx] = cmd | (WORD_FOLLOWS << 2);
+        // Just piggybacking on system endianness here
+        ((uint16_t *) (&code[code_idx+1]))[0] = value;
+        return code_idx+3;
+    } else {
+        code[code_idx] = cmd | (value << 2);
+        return code_idx+1;
+    }
+}
+
+char * cmds[] = { "push", "ref", "skip", "eval" };
+void print_asm(unsigned char * code, int code_idx) {
+    for(int i=0; i<code_idx; i++) {
+        uint8_t cmd = code[i] & 0b11;
+        int value = code[i] >> 2;
+        char mode = 's';
+        if(value == WORD_FOLLOWS) {
+            value = ((uint16_t *) (&code[i+1]))[0];
+            i += 2;
+            mode = 'w';
+        }
+        printf("%s %c %d\n", cmds[cmd], mode, value);
+    }
+}
+
+//
+// Running
+//
+
+Stack argstack;
+
+void run_func(uint16_t func, uint16_t num_args) {
+    uint8_t type = memory[func];
+
+    if (type == 0) {
+        uint8_t prim = memory[func+1];
+        switch(prim) {
+            case PRIM_PLUS:
+                push(&argstack, pop(&argstack) + pop(&argstack));
+                break;
+            case PRIM_PRINT:
+                for(int i=0;i<num_args;i++) { printf("%d ", peek(&argstack)); }
+                printf("\n");
+                break;
+            case PRIM_LS:
+                ls();
+                push(&argstack, 0);
+                break;
+            default:
+                printf("Hello from primitive #%d\n", prim);
+                push(&argstack, 0);
+                break;
+        }
+    } else {
+        printf("TODO: interpret native code.\n");
+    }
+}
+
+void run_code(unsigned char * code, int length) {
+    for (int i=0; i<length; i++) {
+        uint8_t cmd = code[i] & 0b11;
+        int value = code[i] >> 2;
+        if (value == WORD_FOLLOWS) {
+            value = ((uint16_t *) (&code[i+1]))[0];
+            i+=2;
+        }
+        switch(cmd) {
+            case CMD_EVAL:
+                //printf("eval %d\n", value);
+                if(value == 0) { // clear argstack at end of line
+                    printf("[%d] Ok.\n", pop(&argstack));
+                    argstack.length = 0;
+                }
+                else run_func(pop(&argstack), value-1);
+                break;
+            case CMD_PUSH:
+                //printf("push %d\n", value);
+                push(&argstack, value);
+                break;
+            case CMD_REF:
+                //printf("ref %d\n", value);
+                push(&argstack, lookup_variable(value));
+                break;
+            case CMD_SKIP:
+                break;
+        }
+    }
+}
+
+void compile_postfixed() {
+    Stack countstack = { 256, 0, malloc(256) };
+
+    unsigned char code[256];
+    int code_idx = 0;
     char buffer[256];
 
      printf("\nREADY.\n> ");
@@ -163,7 +233,7 @@ void run_postfixed() {
                 result = (result * 10) + (ch-'0');
                 ch = getchar();
             } while(ch >= '0' && ch <= '9');
-            push(&argstack, result);
+            code_idx = add_command(CMD_PUSH, result, code, code_idx);
             count(&countstack, 1);
             if (!is_whitespace_char(ch) || (countstack.length == 1 && ch == '\n')) continue; // so that superfluous 'ch' is processed in next round
         } else if (ch=='\"') {
@@ -171,26 +241,31 @@ void run_postfixed() {
         } else if (ch == '(') {
             bopen(&countstack);
         } else if (ch == ')' || (countstack.length == 1 && ch == '\n')) {
-            if (argstack.length > 0) {
-                uint16_t func = pop(&argstack);
-                uint16_t num_args = bclose(&countstack)-1;
-                    if (ch == '\n') bopen(&countstack); // for bracketless
-                //printf("Running func %d with %d args\n", func, num_args);
-                run_func(func, num_args);
+            // printf("Num args at level %d: %d\n", countstack.length, peek(&countstack));
+            uint16_t num_args = bclose(&countstack);//-1;
+            if (num_args > 0) {
+                if (ch != '\n') { count(&countstack, 1); } // count return value from previous expr
+                if (ch == '\n') { bopen(&countstack); } // for bracketless
+                code_idx = add_command(CMD_EVAL, num_args, code, code_idx);
             } else if (ch == ')') printf("Bracket mismatch!\n");
 
-                if(countstack.length == 1 && ch == '\n') {
-                    // printf("Cleaning argstack\n");
-                    argstack.length = 0;
-                    printf("> ");
-                }
+            if(countstack.length == 1 && ch == '\n') {
+                //print_asm(code, code_idx);
+                // Add command to clear argstack
+                code_idx = add_command(CMD_EVAL, 0, code, code_idx);
+                run_code(code, code_idx);
+                code_idx = 0;
+                argstack.length = 0;
+                printf("> ");
+          }
 
         } else {
             // printf("Label\n");
             int i=0;
             while (!is_whitespace_char(ch) && ch != '(' && ch != ')') { buffer[i++] = ch; ch = getchar(); }
             buffer[i++] = 0;
-            push(&argstack, lookup_variable(unique_string(buffer)));
+            // push(&argstack, lookup_variable(unique_string(buffer)));
+            code_idx = add_command(CMD_REF, unique_string(buffer), code, code_idx);
             count(&countstack, 1);
             if (!is_whitespace_char(ch) || (countstack.length == 1 && ch == '\n')) continue; // so that superfluous 'ch' is processed in next round
         }
@@ -210,10 +285,6 @@ int main (int argc, char ** argv) {
     argstack.size = 256;
     argstack.values = malloc(256);
 
-    countstack.length = 0;
-    countstack.size = 256;
-    countstack.values = malloc(256);
-
     // test program
     unique_string("+"); // test (de)duplication of strings
     add_variable("+", add_primitive(PRIM_PLUS));
@@ -227,5 +298,6 @@ int main (int argc, char ** argv) {
     printf("\n");
 
     ls();
-    run_postfixed();
+//    run_postfixed();
+    compile_postfixed();
 }

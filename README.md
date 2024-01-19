@@ -2,6 +2,11 @@
 Selfless is a retroprogramming language, sprinkling a few Selfish novelties
 over an otherwise quite achaic LISP dialect.
 
+It runs by the _very_ modest paradigm that "everything is an integer".
+
+"Abstractions are there so you can't break stuff. This has two downsides: 1)
+abstractions are there; and 2) you can't break stuff."
+
 ## Current state
 ...is 'work in progress'.
 
@@ -11,14 +16,16 @@ the system cannot supply more information than just their number).
 
 Here are some examples of expressions you can type:
 
-        hi or (hi)      --> you are greeted from a primitive function
+        hi              --> you are greeted from a primitive function
         hi print        --> you get the integer value of 'hi'
         hi 42 print     --> print variable number of args
         (1 2 +) print   --> nested expression support
         42              --> will try to evaluate value as function(!)
 
 This demonstrates the preliminary framework for variables, (primitive)
-functions and their evaluation.
+functions and their compilation into bytecode and subsequent evaluation. It
+also demonstrates the quirk that, without types, it is easy to cause values to
+be interpreted as function references.
 
 What follows below is design, not current state.
 
@@ -127,6 +134,23 @@ administration allows us to reference primitives just like any other function.
 On startup, the interpreter not only adds these primitive stubs, but also names
 them through variables.
 
+### Variable and function resolution
+For both variables and functions, we should be able to predict their location
+at compile time: either they are arguments to the (nested) lambdas currently
+being defined (this includes 'let' blocks), or they already exist globally.
+
+In the latter case they can be fully resolved at compile time; but in the
+former their location may differ between calls (especially when recursive), and
+our best way to refer to them is as 'local var #n'; so by an offset relative to
+the current start of local vars.
+
+Notice that the code still needs to reference the variable slot and not just
+insert its value. Also, fixing the slot does not stop functions from being
+first-class citizens, as we can still pass the function pointer value around
+and assign it other names.
+
+For now, we just stick to the simpler method of runtime lookup by name, and
+make that work first.
 
 ### 32-bit support
 Although the envisioned environment for this language may be that of a home
