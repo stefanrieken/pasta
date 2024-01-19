@@ -6,7 +6,7 @@
 
 #include "stack.h"
 
-char * memory;
+uint8_t * memory;
 
 #define MAX_MEM (64 * 1024)
 
@@ -29,6 +29,7 @@ int vars_end;
 #define PRIM_HELLO 42
 #define PRIM_PRINT 43
 #define PRIM_LS 44
+#define PRIM_IF 45
 
 typedef struct Variable {
     uint16_t name;
@@ -42,7 +43,7 @@ typedef struct Variable {
 uint16_t unique_string(char * string) {
     int i = 0; // or absolute: i=STRING_START
     while (memory[STRING_START+i] != 0) {
-        if (strcmp(string, &memory[STRING_START+i+1]) == 0) return i+1;
+        if (strcmp(string, (char *) (&memory[STRING_START+i+1])) == 0) return i+1;
         i += memory[STRING_START+i]; // follow chain
         if(i >= MAX_STRING) { printf("String overflow!\n"); return 0; }
     }
@@ -52,7 +53,7 @@ uint16_t unique_string(char * string) {
     memory[STRING_START+i] = len+1; // = skip count
 
     int result = i+1;
-    strcpy(&memory[STRING_START+result], string);
+    strcpy((char *) (&memory[STRING_START+result]), string);
     memory[STRING_START+i+len+1] = 0; // mark end of chain
 
     return result;
@@ -122,7 +123,7 @@ int next_non_whitespace_char(int until) {
 int add_command(unsigned char cmd, uint32_t value, unsigned char * code, int code_idx) {
     if (value > 59) {
         // Can't encode within 2^6 - 4
-        // encode as 'word follows' (for now always 16-bit
+        // encode as 'word follows' (for now always 16-bit)
         code[code_idx] = cmd | (WORD_FOLLOWS << 2);
         // Just piggybacking on system endianness here
         ((uint16_t *) (&code[code_idx+1]))[0] = value;
@@ -133,7 +134,7 @@ int add_command(unsigned char cmd, uint32_t value, unsigned char * code, int cod
     }
 }
 
-char * cmds[] = { "push", "ref", "skip", "eval" };
+char * cmds[] = { "eval", "push", "ref", "skip" };
 void print_asm(unsigned char * code, int code_idx) {
     for(int i=0; i<code_idx; i++) {
         uint8_t cmd = code[i] & 0b11;
@@ -154,22 +155,30 @@ void print_asm(unsigned char * code, int code_idx) {
 
 Stack argstack;
 
+void run_code(unsigned char * code, int length);
+
 void run_func(uint16_t func, uint16_t num_args) {
     uint8_t type = memory[func];
+    uint16_t result;
 
-    if (type == 0) {
+    if (type == 0) { // signals primitive func
         uint8_t prim = memory[func+1];
         switch(prim) {
             case PRIM_PLUS:
                 push(&argstack, pop(&argstack) + pop(&argstack));
                 break;
             case PRIM_PRINT:
-                for(int i=0;i<num_args;i++) { printf("%d ", peek(&argstack)); }
+                for(int i=0;i<num_args;i++) { result = pop(&argstack); printf("%d ", result); }
                 printf("\n");
+                push(&argstack, result);
                 break;
             case PRIM_LS:
                 ls();
                 push(&argstack, 0);
+                break;
+            case PRIM_IF:
+                if(pop(&argstack)) { run_func(pop(&argstack), 0); }
+                else push(&argstack, 0);
                 break;
             default:
                 printf("Hello from primitive #%d\n", prim);
@@ -177,7 +186,9 @@ void run_func(uint16_t func, uint16_t num_args) {
                 break;
         }
     } else {
-        printf("TODO: interpret native code.\n");
+        // 'type' is actually a skip_code instruction
+        uint16_t length = ((uint16_t *) (&memory[func+1]))[0];
+        run_code(&memory[func+3], length);
     }
 }
 
@@ -207,6 +218,9 @@ void run_code(unsigned char * code, int length) {
                 push(&argstack, lookup_variable(value));
                 break;
             case CMD_SKIP:
+                //printf("skip %d\n", value);
+                push(&argstack, i-2); // push start address of block
+                i += value; // then skip
                 break;
         }
     }
@@ -214,8 +228,9 @@ void run_code(unsigned char * code, int length) {
 
 void compile_postfixed() {
     Stack countstack = { 256, 0, malloc(256) };
+    Stack skipstack = {256, 0, malloc(256) };
 
-    unsigned char code[256];
+    uint8_t * code = &memory[0]; // set parse buffer at start of mem
     int code_idx = 0;
     char buffer[256];
 
@@ -238,6 +253,21 @@ void compile_postfixed() {
             if (!is_whitespace_char(ch) || (countstack.length == 1 && ch == '\n')) continue; // so that superfluous 'ch' is processed in next round
         } else if (ch=='\"') {
             printf("Todo parse string\n");
+        } else if (ch == '{') {
+            bopen(&countstack);
+            bopen(&skipstack);
+            count(&skipstack, code_idx); // TODO make this always relative to last opening accolade, to make nesting work
+            code_idx = add_command(CMD_SKIP, 0xFFFF, code, code_idx); // Force creation of word-sized value, to be overwritten later
+        } else if (ch == '}') {
+            uint16_t num_args = bclose(&countstack);
+            // Assuming we want 'separator-separated' commands inside {},
+            // and assuming there is an expression without an end separator,
+            // finalize that expression:
+            code_idx = add_command(CMD_EVAL, num_args, code, code_idx);
+
+            count(&countstack, 1);
+            int where = bclose(&skipstack);
+            ((uint16_t *) (&code[where+1]))[0] = code_idx - where - 3; // 3 == size of skip instruction itself
         } else if (ch == '(') {
             bopen(&countstack);
         } else if (ch == ')' || (countstack.length == 1 && ch == '\n')) {
@@ -250,9 +280,9 @@ void compile_postfixed() {
             } else if (ch == ')') printf("Bracket mismatch!\n");
 
             if(countstack.length == 1 && ch == '\n') {
-                //print_asm(code, code_idx);
                 // Add command to clear argstack
                 code_idx = add_command(CMD_EVAL, 0, code, code_idx);
+                //print_asm(code, code_idx);
                 run_code(code, code_idx);
                 code_idx = 0;
                 argstack.length = 0;
@@ -291,6 +321,7 @@ int main (int argc, char ** argv) {
     add_variable("hi", add_primitive(PRIM_HELLO));
     add_variable("print", add_primitive(PRIM_PRINT));
     add_variable("ls", add_primitive(PRIM_LS));
+    add_variable("if", add_primitive(PRIM_IF));
 
     printf("Known strings:");
     int i = STRING_START;

@@ -16,16 +16,18 @@ the system cannot supply more information than just their number).
 
 Here are some examples of expressions you can type:
 
-        hi              --> you are greeted from a primitive function
-        hi print        --> you get the integer value of 'hi'
-        hi 42 print     --> print variable number of args
-        (1 2 +) print   --> nested expression support
-        42              --> will try to evaluate value as function(!)
+        hi               --> you are greeted from a primitive function
+        hi print         --> you get the integer value of 'hi'
+        hi 42 print      --> print variable number of args
+        (1 2 +) print    --> nested expression support
+        42               --> will try to evaluate value as function(!)
+        {42 print} 1 if  --> conditionaly execute block
+        {42 print} print --> print the address of block (within buffer)
 
 This demonstrates the preliminary framework for variables, (primitive)
-functions and their compilation into bytecode and subsequent evaluation. It
-also demonstrates the quirk that, without types, it is easy to cause values to
-be interpreted as function references.
+functions, and conditionals, as well as their compilation into bytecode and
+subsequent evaluation. It also demonstrates the quirk that, without types, it
+is easy to cause values to be interpreted as function references.
 
 What follows below is design, not current state.
 
