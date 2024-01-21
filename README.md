@@ -10,24 +10,34 @@ abstractions are there; and 2) you can't break stuff."
 ## Current state
 ...is 'work in progress'.
 
-Upon execution, known strings and variables are listed. Of these variables,
-'+', 'hi' and 'print' indicate primitive functions (variables are untyped, so
-the system cannot supply more information than just their number).
+Upon execution, known strings and variables are listed. Most of the variables
+presently represent primitive functions (variables are untyped, so the system
+cannot supply more information than just their number).
 
 Here are some examples of expressions you can type:
 
         hi               --> you are greeted from a primitive function
-        hi print         --> you get the integer value of 'hi'
+        hi print         --> you get the integer (pointer) value of 'hi'
         hi 42 print      --> print variable number of args
         (1 2 +) print    --> nested expression support
         42               --> will try to evaluate value as function(!)
         {42 print} 1 if  --> conditionaly execute block
         {42 print} print --> print the address of block (within buffer)
+        42 "x" define    --> define variable x
 
 This demonstrates the preliminary framework for variables, (primitive)
 functions, and conditionals, as well as their compilation into bytecode and
 subsequent evaluation. It also demonstrates the quirk that, without types, it
 is easy to cause values to be interpreted as function references.
+
+You can also define a function:
+
+        ({ ("x" args) (ls) } "foo" define) (42 foo)
+
+For now, this has to be a one-liner, as the function is never copied into main
+memory from the parse buffer, so it is overwritten by the very next read. Next,
+the interpreter half chokes on the perceived single top-level expression -- so
+yeah, here is still work to do.
 
 What follows below is design, not current state.
 
@@ -97,20 +107,25 @@ code:
 
         { ["x"] ({ "yes" print } if x) } "foo" define
 
-## (Var)arg processing
-In the preceding we used explicit argument popping and scoping, but failed to
-address that the first argument would be an argument count, let alone use this
-to process varargs, or simply missing args.
+## Lambda syntax
+LISP's lambda syntax implies runtime creation: "make a function by combining
+these argnames with these expressions" (and in lexically scoped LISP, bind the
+current environment).
 
-A better shortcut would be that any method (or block!) must open with an in-line
-array of arg names, for the interpreter to recognize:
+In Selfless it is both easier and more evident if we make the syntax match the
+fact that functions are created at compile time. That is to say, in Selfless a
+function is block which at runtime takes arguments from the stack and names
+them for the duration of the block.
 
-        {13} [1] x ...
+At the end of a block, the interpreter already should reset the argstack to the
+original position + a single return value; now it is also asked to reset the
+variable list to the position before execution. As this can be applied to any
+kind of block, this can be built into the interpreter.
 
-A negative value (or similar bit manipulation) can be used to imply a remainder
-argname, which would require some array handling methods to use. Notice that if
-we would ever support in-linable user arrays in general, it would have to be
-done exactly like blocks, as we cannot distinguish the two by type.
+This makes the initial act of taking stack arguments 'non-special', so it can
+be supported through any (primitive) function call, or even sequence thereof:
+
+        { "x" "y" args; "z" remainder; * x y } foo define;
 
 ## Virtual machine
 

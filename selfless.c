@@ -10,7 +10,10 @@ uint8_t * memory;
 
 #define MAX_MEM (64 * 1024)
 
+#define PARSE_BUFFER_START (256)
+
 #define CODE_START (1 * 1024)
+#define MAX_PARSE_BUFFER (CODE_START - PARSE_BUFFER_START)
 
 #define STRING_START (4 * 1024)
 #define MAX_CODE (STRING_START - CODE_START)
@@ -25,13 +28,17 @@ int code_end;
 int vars_end;
 
 // Primitive defs
-#define PRIM_PLUS 41
+#define PRIM_PLUS 40
+#define PRIM_EQ 41
 #define PRIM_HELLO 42
 #define PRIM_PRINT 43
 #define PRIM_LS 44
 #define PRIM_IF 45
+#define PRIM_DEFINE 46
+#define PRIM_ARGS 47
+#define PRIM_REMAINDER 48
 
-typedef struct Variable {
+typedef struct __attribute__((__packed__)) Variable {
     uint16_t name;
     uint16_t value; // TODO do we assume all types' values fit in 16 bits?
 } Variable;
@@ -61,20 +68,24 @@ uint16_t unique_string(char * string) {
 
 #define str(v) ((char *) &memory[STRING_START+v])
 
-uint16_t add_variable(char * name, uint16_t value) {
+uint16_t add_var(uint16_t name, uint16_t value) {
     if (vars_end >= VARS_START+MAX_VARS) { printf("Variable overflow!\n"); return 0; }
     Variable * var = (Variable *) &memory[vars_end];
-    var->name = unique_string(name);
+    var->name = name;
     var->value = value;
     uint16_t result = vars_end;
     vars_end += sizeof(Variable);
     return result;
 }
 
-uint16_t lookup_variable(uint16_t name) {
+uint16_t add_variable(char * name, uint16_t value) {
+    return add_var(unique_string(name), value);
+}
+
+Variable * lookup_variable(uint16_t name) {
     for (int i=VARS_START;i<vars_end;i+=sizeof(Variable)) {
         Variable * var = (Variable *) &memory[i];
-        if(var->name == name) return var->value;
+        if(var->name == name) return var;
     }
 
     printf("Var not found: %d\n", name);
@@ -102,6 +113,12 @@ uint16_t add_primitive(uint16_t prim) {
     return result;
 }
 
+static inline
+bool is_bracket_char(int ch) {
+    return ch == '(' || ch == ')' || ch == '{' || ch == '}';
+}
+
+static inline
 bool is_whitespace_char(int ch) {
     return ch == ' ' || ch == '\t' || ch == '\r' || ch == '\n';
 }
@@ -120,34 +137,6 @@ int next_non_whitespace_char(int until) {
 #define WORD_FOLLOWS 0b111110
 #define LONG_FOLLOWS 0b111111
 
-int add_command(unsigned char cmd, uint32_t value, unsigned char * code, int code_idx) {
-    if (value > 59) {
-        // Can't encode within 2^6 - 4
-        // encode as 'word follows' (for now always 16-bit)
-        code[code_idx] = cmd | (WORD_FOLLOWS << 2);
-        // Just piggybacking on system endianness here
-        ((uint16_t *) (&code[code_idx+1]))[0] = value;
-        return code_idx+3;
-    } else {
-        code[code_idx] = cmd | (value << 2);
-        return code_idx+1;
-    }
-}
-
-char * cmds[] = { "eval", "push", "ref", "skip" };
-void print_asm(unsigned char * code, int code_idx) {
-    for(int i=0; i<code_idx; i++) {
-        uint8_t cmd = code[i] & 0b11;
-        int value = code[i] >> 2;
-        char mode = 's';
-        if(value == WORD_FOLLOWS) {
-            value = ((uint16_t *) (&code[i+1]))[0];
-            i += 2;
-            mode = 'w';
-        }
-        printf("%s %c %d\n", cmds[cmd], mode, value);
-    }
-}
 
 //
 // Running
@@ -155,11 +144,11 @@ void print_asm(unsigned char * code, int code_idx) {
 
 Stack argstack;
 
-void run_code(unsigned char * code, int length);
+void run_code(unsigned char * code, int length, bool toplevel);
 
 void run_func(uint16_t func, uint16_t num_args) {
     uint8_t type = memory[func];
-    uint16_t result;
+    uint16_t temp;
 
     if (type == 0) { // signals primitive func
         uint8_t prim = memory[func+1];
@@ -167,10 +156,17 @@ void run_func(uint16_t func, uint16_t num_args) {
             case PRIM_PLUS:
                 push(&argstack, pop(&argstack) + pop(&argstack));
                 break;
+            case PRIM_EQ:
+                push(&argstack, pop(&argstack) == pop(&argstack));
+               break;
+            case PRIM_HELLO:
+                printf("Hello from primitive #%d\n", prim);
+                push(&argstack, 0);
+               break;
             case PRIM_PRINT:
-                for(int i=0;i<num_args;i++) { result = pop(&argstack); printf("%d ", result); }
+                for(int i=0;i<num_args;i++) { temp = pop(&argstack); printf("%d ", temp); }
                 printf("\n");
-                push(&argstack, result);
+                push(&argstack, temp);
                 break;
             case PRIM_LS:
                 ls();
@@ -180,19 +176,42 @@ void run_func(uint16_t func, uint16_t num_args) {
                 if(pop(&argstack)) { run_func(pop(&argstack), 0); }
                 else push(&argstack, 0);
                 break;
+            case PRIM_DEFINE:
+                // Do this in two code lines since C also doesn't make evaluation order promises
+                temp = pop(&argstack);
+                add_var(temp, peek(&argstack)); // return the value
+                break;
+            case PRIM_ARGS:
+            printf("hiero %d\n", num_args);
+                // As we call another function to pop our own args,
+                // the callstack is a bit crowded, e.g.: "y" "x" 43 42
+                // So define args first, then pop values
+                temp = vars_end;
+                for (int i=0; i<num_args;i++) add_var(pop(&argstack), 0);
+                for (int i=0; i<num_args;i++) ((Variable *) (&memory[temp]))[i].value = pop(&argstack);
+                push(&argstack, 0);
+                break;
+            case PRIM_REMAINDER:
+                printf("TODO work out arrays & use for remainder args\n");
+                break;
             default:
-                printf("Hello from primitive #%d\n", prim);
+                // It is very easy to come here by triggering the
+                // evaluation of a random value as a function.
+                printf("Invalid function reference: %d\n", func);
                 push(&argstack, 0);
                 break;
         }
     } else {
         // 'type' is actually a skip_code instruction
         uint16_t length = ((uint16_t *) (&memory[func+1]))[0];
-        run_code(&memory[func+3], length);
+        run_code(&memory[func+3], length, false);
     }
 }
 
-void run_code(unsigned char * code, int length) {
+void run_code(unsigned char * code, int length, bool toplevel) {
+    int saved_vars_end = vars_end;
+    int saved_argstack = argstack.length;
+
     for (int i=0; i<length; i++) {
         uint8_t cmd = code[i] & 0b11;
         int value = code[i] >> 2;
@@ -215,14 +234,54 @@ void run_code(unsigned char * code, int length) {
                 break;
             case CMD_REF:
                 //printf("ref %d\n", value);
-                push(&argstack, lookup_variable(value));
+                push(&argstack, lookup_variable(value)->value);
                 break;
             case CMD_SKIP:
                 //printf("skip %d\n", value);
-                push(&argstack, i-2); // push start address of block
+                push(&argstack, (code-memory)+i-2); // push start address of block
                 i += value; // then skip
                 break;
         }
+    }
+
+    // Reset scope, argstack
+    if (!toplevel) {
+        vars_end = saved_vars_end;
+        int result = pop(&argstack);
+        argstack.length = saved_argstack;
+        push(&argstack, result);
+    }
+}
+
+int add_command(unsigned char cmd, uint32_t value, unsigned char * code, int code_idx) {
+    int result;
+    if (value > 59) {
+        // Can't encode within 2^6 - 4
+        // encode as 'word follows' (for now always 16-bit)
+        code[code_idx] = cmd | (WORD_FOLLOWS << 2);
+        // Just piggybacking on system endianness here
+        ((uint16_t *) (&code[code_idx+1]))[0] = value;
+        result = code_idx+3;
+    } else {
+        code[code_idx] = cmd | (value << 2);
+        result = code_idx+1;
+    }
+    if(result > MAX_PARSE_BUFFER) printf("Parse buffer overflow!\n");
+    return result;
+}
+
+char * cmds[] = { "eval", "push", "ref", "skip" };
+void print_asm(unsigned char * code, int code_idx) {
+    for(int i=0; i<code_idx; i++) {
+        uint8_t cmd = code[i] & 0b11;
+        int value = code[i] >> 2;
+        char mode = 's';
+        if(value == WORD_FOLLOWS) {
+            value = ((uint16_t *) (&code[i+1]))[0];
+            i += 2;
+            mode = 'w';
+        }
+        printf("%s %c %d\n", cmds[cmd], mode, value);
     }
 }
 
@@ -230,7 +289,7 @@ void compile_postfixed() {
     Stack countstack = { 256, 0, malloc(256) };
     Stack skipstack = {256, 0, malloc(256) };
 
-    uint8_t * code = &memory[0]; // set parse buffer at start of mem
+    uint8_t * code = &memory[PARSE_BUFFER_START];
     int code_idx = 0;
     char buffer[256];
 
@@ -252,7 +311,14 @@ void compile_postfixed() {
             count(&countstack, 1);
             if (!is_whitespace_char(ch) || (countstack.length == 1 && ch == '\n')) continue; // so that superfluous 'ch' is processed in next round
         } else if (ch=='\"') {
-            printf("Todo parse string\n");
+            int i = 0;
+            do {
+                ch = getchar();
+                if (ch != '\"') buffer[i++] = ch;
+            } while (ch != '\"');
+            buffer[i++] = 0;
+            code_idx = add_command(CMD_PUSH, unique_string(buffer), code, code_idx);
+            count(&countstack, 1);
         } else if (ch == '{') {
             bopen(&countstack);
             bopen(&skipstack);
@@ -283,7 +349,7 @@ void compile_postfixed() {
                 // Add command to clear argstack
                 code_idx = add_command(CMD_EVAL, 0, code, code_idx);
                 //print_asm(code, code_idx);
-                run_code(code, code_idx);
+                run_code(code, code_idx, true);
                 code_idx = 0;
                 argstack.length = 0;
                 printf("> ");
@@ -292,7 +358,7 @@ void compile_postfixed() {
         } else {
             // printf("Label\n");
             int i=0;
-            while (!is_whitespace_char(ch) && ch != '(' && ch != ')') { buffer[i++] = ch; ch = getchar(); }
+            while (!is_whitespace_char(ch) && !is_bracket_char(ch)) { buffer[i++] = ch; ch = getchar(); }
             buffer[i++] = 0;
             // push(&argstack, lookup_variable(unique_string(buffer)));
             code_idx = add_command(CMD_REF, unique_string(buffer), code, code_idx);
@@ -315,13 +381,18 @@ int main (int argc, char ** argv) {
     argstack.size = 256;
     argstack.values = malloc(256);
 
-    // test program
+    add_variable("true", 1);
+    add_variable("false", 0);
     unique_string("+"); // test (de)duplication of strings
     add_variable("+", add_primitive(PRIM_PLUS));
+    add_variable("=", add_primitive(PRIM_EQ));
     add_variable("hi", add_primitive(PRIM_HELLO));
     add_variable("print", add_primitive(PRIM_PRINT));
     add_variable("ls", add_primitive(PRIM_LS));
     add_variable("if", add_primitive(PRIM_IF));
+    add_variable("define", add_primitive(PRIM_DEFINE));
+    add_variable("args", add_primitive(PRIM_ARGS));
+    add_variable("remainder", add_primitive(PRIM_REMAINDER));
 
     printf("Known strings:");
     int i = STRING_START;
