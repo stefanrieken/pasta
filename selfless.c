@@ -10,6 +10,9 @@ uint8_t * memory;
 
 #define MAX_MEM (64 * 1024)
 
+// The parse buffer is not presently used,
+// but may be re-introduced when parsing prefixed code.
+// (alternative: just reverse args to each expression as we parse it)
 #define PARSE_BUFFER_START (256)
 
 #define CODE_START (1 * 1024)
@@ -19,6 +22,11 @@ uint8_t * memory;
 #define MAX_CODE (STRING_START - CODE_START)
 
 int code_end;
+// We now compile code directly to memory as one big main function,
+// which starts after the primitive references.
+// Notice this presently still misses a proper skip_code header,
+// like we have for blocks (and primitive references are typed with a zero).
+int main_start;
 
 #define VARS_START 8 * 1024
 #define MAX_STRING (VARS_START - STRING_START)
@@ -33,10 +41,11 @@ int vars_end;
 #define PRIM_HELLO 42
 #define PRIM_PRINT 43
 #define PRIM_LS 44
-#define PRIM_IF 45
-#define PRIM_DEFINE 46
-#define PRIM_ARGS 47
-#define PRIM_REMAINDER 48
+#define PRIM_CODE 45
+#define PRIM_IF 46
+#define PRIM_DEFINE 47
+#define PRIM_ARGS 48
+#define PRIM_REMAINDER 49
 
 typedef struct __attribute__((__packed__)) Variable {
     uint16_t name;
@@ -89,7 +98,7 @@ Variable * lookup_variable(uint16_t name) {
     }
 
     printf("Var not found: %d\n", name);
-    return 0;
+    return (Variable *) &memory[VARS_START]; // false
 }
 
 void ls() {
@@ -146,6 +155,21 @@ Stack argstack;
 
 void run_code(unsigned char * code, int length, bool toplevel);
 
+char * cmds[] = { "eval", "push", "ref", "skip" };
+void print_asm(unsigned char * code, int code_end) {
+    for(int i=0; i<code_end; i++) {
+        uint8_t cmd = code[i] & 0b11;
+        int value = code[i] >> 2;
+        char mode = 's';
+        if(value == WORD_FOLLOWS) {
+            value = ((uint16_t *) (&code[i+1]))[0];
+            i += 2;
+            mode = 'w';
+        }
+        printf("%s %c %d\n", cmds[cmd], mode, value);
+    }
+}
+
 void run_func(uint16_t func, uint16_t num_args) {
     uint8_t type = memory[func];
     uint16_t temp;
@@ -172,6 +196,10 @@ void run_func(uint16_t func, uint16_t num_args) {
                 ls();
                 push(&argstack, 0);
                 break;
+            case PRIM_CODE:
+                print_asm(&memory[CODE_START+main_start], code_end-main_start);
+                push(&argstack, 0);
+                break;
             case PRIM_IF:
                 if(pop(&argstack)) { run_func(pop(&argstack), 0); }
                 else push(&argstack, 0);
@@ -182,7 +210,6 @@ void run_func(uint16_t func, uint16_t num_args) {
                 add_var(temp, peek(&argstack)); // return the value
                 break;
             case PRIM_ARGS:
-            printf("hiero %d\n", num_args);
                 // As we call another function to pop our own args,
                 // the callstack is a bit crowded, e.g.: "y" "x" 43 42
                 // So define args first, then pop values
@@ -219,6 +246,7 @@ void run_code(unsigned char * code, int length, bool toplevel) {
             value = ((uint16_t *) (&code[i+1]))[0];
             i+=2;
         }
+
         switch(cmd) {
             case CMD_EVAL:
                 //printf("eval %d\n", value);
@@ -266,31 +294,17 @@ int add_command(unsigned char cmd, uint32_t value, unsigned char * code, int cod
         code[code_idx] = cmd | (value << 2);
         result = code_idx+1;
     }
-    if(result > MAX_PARSE_BUFFER) printf("Parse buffer overflow!\n");
+    if(result > MAX_CODE) printf("Code overflow!\n");
     return result;
 }
 
-char * cmds[] = { "eval", "push", "ref", "skip" };
-void print_asm(unsigned char * code, int code_idx) {
-    for(int i=0; i<code_idx; i++) {
-        uint8_t cmd = code[i] & 0b11;
-        int value = code[i] >> 2;
-        char mode = 's';
-        if(value == WORD_FOLLOWS) {
-            value = ((uint16_t *) (&code[i+1]))[0];
-            i += 2;
-            mode = 'w';
-        }
-        printf("%s %c %d\n", cmds[cmd], mode, value);
-    }
-}
-
-void compile_postfixed() {
+void compile_postfixed(bool repl) {
     Stack countstack = { 256, 0, malloc(256) };
     Stack skipstack = {256, 0, malloc(256) };
 
-    uint8_t * code = &memory[PARSE_BUFFER_START];
-    int code_idx = 0;
+    uint8_t * code = &memory[CODE_START];
+    main_start = code_end;
+    int pc = code_end;
     char buffer[256];
 
      printf("\nREADY.\n> ");
@@ -307,7 +321,7 @@ void compile_postfixed() {
                 result = (result * 10) + (ch-'0');
                 ch = getchar();
             } while(ch >= '0' && ch <= '9');
-            code_idx = add_command(CMD_PUSH, result, code, code_idx);
+            code_end = add_command(CMD_PUSH, result, code, code_end);
             count(&countstack, 1);
             if (!is_whitespace_char(ch) || (countstack.length == 1 && ch == '\n')) continue; // so that superfluous 'ch' is processed in next round
         } else if (ch=='\"') {
@@ -317,23 +331,27 @@ void compile_postfixed() {
                 if (ch != '\"') buffer[i++] = ch;
             } while (ch != '\"');
             buffer[i++] = 0;
-            code_idx = add_command(CMD_PUSH, unique_string(buffer), code, code_idx);
+            code_end = add_command(CMD_PUSH, unique_string(buffer), code, code_end);
             count(&countstack, 1);
         } else if (ch == '{') {
             bopen(&countstack);
             bopen(&skipstack);
-            count(&skipstack, code_idx); // TODO make this always relative to last opening accolade, to make nesting work
-            code_idx = add_command(CMD_SKIP, 0xFFFF, code, code_idx); // Force creation of word-sized value, to be overwritten later
-        } else if (ch == '}') {
+            count(&skipstack, code_end); // TODO make this always relative to last opening accolade, to make nesting work
+            code_end = add_command(CMD_SKIP, 0xFFFF, code, code_end); // Force creation of word-sized value, to be overwritten later
+        } else if (ch == '}' || ch == ';') {
             uint16_t num_args = bclose(&countstack);
             // Assuming we want 'separator-separated' commands inside {},
             // and assuming there is an expression without an end separator,
             // finalize that expression:
-            code_idx = add_command(CMD_EVAL, num_args, code, code_idx);
+            code_end = add_command(CMD_EVAL, num_args, code, code_end);
 
-            count(&countstack, 1);
-            int where = bclose(&skipstack);
-            ((uint16_t *) (&code[where+1]))[0] = code_idx - where - 3; // 3 == size of skip instruction itself
+            if (ch == '}') {
+                int where = bclose(&skipstack);
+                ((uint16_t *) (&code[where+1]))[0] = code_end - where - 3; // 3 == size of skip instruction itself
+                count(&countstack, 1);
+            } else {
+                bopen(&countstack); // add new statement
+            }
         } else if (ch == '(') {
             bopen(&countstack);
         } else if (ch == ')' || (countstack.length == 1 && ch == '\n')) {
@@ -342,26 +360,28 @@ void compile_postfixed() {
             if (num_args > 0) {
                 if (ch != '\n') { count(&countstack, 1); } // count return value from previous expr
                 if (ch == '\n') { bopen(&countstack); } // for bracketless
-                code_idx = add_command(CMD_EVAL, num_args, code, code_idx);
+                code_end = add_command(CMD_EVAL, num_args, code, code_end);
             } else if (ch == ')') printf("Bracket mismatch!\n");
 
             if(countstack.length == 1 && ch == '\n') {
                 // Add command to clear argstack
-                code_idx = add_command(CMD_EVAL, 0, code, code_idx);
-                //print_asm(code, code_idx);
-                run_code(code, code_idx, true);
-                code_idx = 0;
-                argstack.length = 0;
+                code_end = add_command(CMD_EVAL, 0, code, code_end);
+                //print_asm(&code[main_start], code_end-main_start);
+                if (repl) {
+                    run_code(&code[pc], code_end-pc, true);
+                    pc = code_end;
+                }
+                //argstack.length = 0;
                 printf("> ");
           }
 
         } else {
             // printf("Label\n");
             int i=0;
-            while (!is_whitespace_char(ch) && !is_bracket_char(ch)) { buffer[i++] = ch; ch = getchar(); }
+            while (!is_whitespace_char(ch) && !is_bracket_char(ch) && ch != ';') { buffer[i++] = ch; ch = getchar(); }
             buffer[i++] = 0;
             // push(&argstack, lookup_variable(unique_string(buffer)));
-            code_idx = add_command(CMD_REF, unique_string(buffer), code, code_idx);
+            code_end = add_command(CMD_REF, unique_string(buffer), code, code_end);
             count(&countstack, 1);
             if (!is_whitespace_char(ch) || (countstack.length == 1 && ch == '\n')) continue; // so that superfluous 'ch' is processed in next round
         }
@@ -381,14 +401,15 @@ int main (int argc, char ** argv) {
     argstack.size = 256;
     argstack.values = malloc(256);
 
-    add_variable("true", 1);
     add_variable("false", 0);
+    add_variable("true", 1);
     unique_string("+"); // test (de)duplication of strings
     add_variable("+", add_primitive(PRIM_PLUS));
     add_variable("=", add_primitive(PRIM_EQ));
     add_variable("hi", add_primitive(PRIM_HELLO));
     add_variable("print", add_primitive(PRIM_PRINT));
     add_variable("ls", add_primitive(PRIM_LS));
+    add_variable("code", add_primitive(PRIM_CODE));
     add_variable("if", add_primitive(PRIM_IF));
     add_variable("define", add_primitive(PRIM_DEFINE));
     add_variable("args", add_primitive(PRIM_ARGS));
@@ -400,6 +421,5 @@ int main (int argc, char ** argv) {
     printf("\n");
 
     ls();
-//    run_postfixed();
-    compile_postfixed();
+    compile_postfixed(true);
 }

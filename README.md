@@ -8,7 +8,7 @@ It runs by the _very_ modest paradigm that "everything is an integer".
 abstractions are there; and 2) you can't break stuff."
 
 ## Current state
-...is 'work in progress'.
+The current interpreter runs postfixed code only.
 
 Upon execution, known strings and variables are listed. Most of the variables
 presently represent primitive functions (variables are untyped, so the system
@@ -32,26 +32,25 @@ is easy to cause values to be interpreted as function references.
 
 You can also define a function:
 
-        ({ ("x" args) (ls) } "foo" define) (42 foo)
+        { "x" args; ls } "foo" define; 42 foo; ls
 
-For now, this has to be a one-liner, as the function is never copied into main
-memory from the parse buffer, so it is overwritten by the very next read. Next,
-the interpreter half chokes on the perceived single top-level expression -- so
-yeah, here is still work to do.
+This demonstrates how 'x' is defined within the function only.
 
-What follows below is design, not current state.
+It is even possible to run an anonymous variant:
+
+        42 { "x" args; ls }; ls
+
+What follows below is design, so not necessarily current state.
 
 ## Simplifications
 Respective to (modern) LISP, Selfless introduces many simplifications, aiming
 at small-footprint execution:
-- Consecutive addressable memory stores both compiled code and data
 - All values are untyped words (i.e. integers or pointers)
-- Single, shadowable, dynamic variable list
-- Dynamic typing; no binding of lambdas
-- No garbage collection; instead, direct memory access + 'compiled' code
-- No macros; only compile time transformations
-- No parsing into linked lists; instead use a parse buffer
-- Zero read-ahead parsing (but a conversion to postfix follows)
+- Single, shadowable, dynamic variable list (= dynamic scoping)
+- No lexical scoping, so no binding of environments to lambdas
+- No garbage collection; instead, directly access all memory
+- No macros or parsing into linked lists; instead use 1-on-1 compilation
+- Zero backtracking during parsing (but a conversion to postfix follows)
 - No 'special forms'; instead, explicitly use "strings", { blocks }
 - Transform lambdas, blocks at compile time
 - Also employ lambda syntax for 'let' scoping ({[x] (+ x x)} 21)
@@ -68,13 +67,13 @@ statements can be predetermined when converting to postfixed.
 NOTE: Actually, we count (num args), resp {code length}.
 
         (define "foo" {
-          lambda (x) (if x {print "yes"})
+            lambda (x) (if x {print "yes"})
         })
 
 After converting lambda into pop / undef var statements (NOTE: see "(Var)arg processing"):
 
         (define "foo" {
-          (pop "x") (if x { (print "yes") }) (undef "x")
+            (pop "x") (if x { (print "yes") }) (undef "x")
         })
 
 Bracket counted (adding outer accolades):
