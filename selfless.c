@@ -392,6 +392,7 @@ void compile(bool repl) {
             bopen(&countstack);
         } else if (ch == ')' || (countstack.length == 1 && ch == '\n')) {
             // printf("Num args at level %d: %d\n", countstack.length, peek(&countstack));
+            if (ch == '\n' && peek(&countstack) == 0) { ch = next_non_whitespace_char('\n'); continue; }
             uint16_t num_args = bclose(&countstack);//-1;
             if (num_args > 0) {
                 if (ch != '\n') { count(&countstack, 1); } // count return value from previous expr
