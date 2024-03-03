@@ -40,12 +40,13 @@ int vars_end;
 #define PRIM_EQ 41
 #define PRIM_HELLO 42
 #define PRIM_PRINT 43
-#define PRIM_LS 44
-#define PRIM_CODE 45
-#define PRIM_IF 46
-#define PRIM_DEFINE 47
-#define PRIM_ARGS 48
-#define PRIM_REMAINDER 49
+#define PRIM_PRINTS 44
+#define PRIM_LS 45
+#define PRIM_CODE 46
+#define PRIM_IF 47
+#define PRIM_DEFINE 48
+#define PRIM_ARGS 49
+#define PRIM_REMAINDER 50
 
 typedef struct __attribute__((__packed__)) Variable {
     uint16_t name;
@@ -201,6 +202,10 @@ void run_func(Stack * argstack, uint16_t num_args) {
                 printf("\n");
                 result = temp;
                 break;
+            case PRIM_PRINTS:
+                while(n != 0) { temp = item(argstack, n--); printf("%s", (char *) &memory[STRING_START + temp]); }
+                result = temp;
+                break;
             case PRIM_LS:
                 ls();
                 result = 0;
@@ -321,6 +326,9 @@ int add_command(unsigned char cmd, uint32_t value, unsigned char * code, int cod
     return result;
 }
 
+char * escapes = "nrtfe";
+char * ctrlchars = "\n\r\t\f\e";
+
 void compile(bool repl) {
     Stack countstack = { 256, 0, malloc(256) };
     Stack skipstack = {256, 0, malloc(256) };
@@ -351,6 +359,11 @@ void compile(bool repl) {
             int i = 0;
             do {
                 ch = getchar();
+	        if (ch == '\\') {
+	          ch = getchar();
+	          for (int i=0; i<strlen(escapes); i++)
+		    if (escapes[i] == ch) { ch = ctrlchars[i]; break; }
+	        }
                 if (ch != '\"') buffer[i++] = ch;
             } while (ch != '\"');
             buffer[i++] = 0;
@@ -430,6 +443,7 @@ int main (int argc, char ** argv) {
     add_variable("=", add_primitive(PRIM_EQ));
     add_variable("hi", add_primitive(PRIM_HELLO));
     add_variable("print", add_primitive(PRIM_PRINT));
+    add_variable("prints", add_primitive(PRIM_PRINTS));
     add_variable("ls", add_primitive(PRIM_LS));
     add_variable("code", add_primitive(PRIM_CODE));
     add_variable("if", add_primitive(PRIM_IF));

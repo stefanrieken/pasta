@@ -1,4 +1,4 @@
-# Selfless
+# Neutrotype
 Selfless is a typeless retroprogramming language, sprinkling Selfish style
 elements over what would otherwise be a quite achaic LISP dialect.
 
@@ -20,6 +20,7 @@ Here are some examples of expressions you can type:
         print hi         --> you get the integer (pointer) value of 'hi'
         print hi 42      --> print variable number of args
         print (+ 1 2)    --> nested expression support
+        prints "hi\n"    --> printing strings requires a separate function
         42               --> will try to evaluate value as function(!)
         if 1 {print 42}  --> conditionaly execute block
         print {print 42} --> print the address of block (within buffer)
