@@ -170,53 +170,69 @@ void print_asm(unsigned char * code, int code_end) {
     }
 }
 
-void run_func(uint16_t func, uint16_t num_args) {
-    uint8_t type = memory[func];
+void run_func(Stack * argstack, uint16_t num_args) {
+    uint16_t n = num_args;
+    uint16_t func = item(argstack, n--);
+    uint8_t type;
+
+    start_run_func:
+
+    type = memory[func];
     uint16_t temp;
+    uint16_t result = 0;
 
     if (type == 0) { // signals primitive func
         uint8_t prim = memory[func+1];
         switch(prim) {
             case PRIM_PLUS:
-                push(&argstack, pop(&argstack) + pop(&argstack));
+                temp = item(argstack, n--);
+                result = temp + item(argstack, n--);
                 break;
             case PRIM_EQ:
-                push(&argstack, pop(&argstack) == pop(&argstack));
+                temp = item(argstack, n--);
+                result = temp == item(argstack, n--);
                break;
             case PRIM_HELLO:
                 printf("Hello from primitive #%d\n", prim);
-                push(&argstack, 0);
+                result = 0;
                break;
             case PRIM_PRINT:
-                for(int i=0;i<num_args;i++) { temp = pop(&argstack); printf("%d ", temp); }
+                while(n != 0) { temp = item(argstack, n--); printf("%d ", temp); }
                 printf("\n");
-                push(&argstack, temp);
+                result = temp;
                 break;
             case PRIM_LS:
                 ls();
-                push(&argstack, 0);
+                result = 0;
                 break;
             case PRIM_CODE:
                 print_asm(&memory[CODE_START+main_start], code_end-main_start);
-                push(&argstack, 0);
+                result = 0;
                 break;
             case PRIM_IF:
-                if(pop(&argstack)) { run_func(pop(&argstack), 0); }
-                else push(&argstack, 0);
+                temp = item(argstack, n--);
+                func = item(argstack, n--);
+                drop(argstack, num_args);
+                num_args = 0; n = 0;
+                if(temp) {
+                    goto start_run_func;
+                }
+                else result = 0;
                 break;
             case PRIM_DEFINE:
-                // Do this in two code lines since C also doesn't make evaluation order promises
-                temp = pop(&argstack);
-                add_var(temp, peek(&argstack)); // return the value
+                temp = item(argstack, n--);
+                add_var(temp, item(argstack, n--)); // return the value
                 break;
             case PRIM_ARGS:
                 // As we call another function to pop our own args,
                 // the callstack is a bit crowded, e.g.: "y" "x" 43 42
                 // So define args first, then pop values
                 temp = vars_end;
-                for (int i=0; i<num_args;i++) add_var(pop(&argstack), 0);
-                for (int i=0; i<num_args;i++) ((Variable *) (&memory[temp]))[i].value = pop(&argstack);
-                push(&argstack, 0);
+                for (int i=0; i<n;i++) add_var(item(argstack, n-i), 0);
+                drop(argstack, num_args);
+                for (int i=0; i<n;i++) ((Variable *) (&memory[temp]))[i].value = item(argstack, n-i);
+                n -= num_args-1;
+                result = 0;
                 break;
             case PRIM_REMAINDER:
                 printf("TODO work out arrays & use for remainder args\n");
@@ -225,14 +241,21 @@ void run_func(uint16_t func, uint16_t num_args) {
                 // It is very easy to come here by triggering the
                 // evaluation of a random value as a function.
                 printf("Invalid function reference: %d\n", func);
-                push(&argstack, 0);
+                result = 0;
                 break;
         }
     } else {
         // 'type' is actually a skip_code instruction
         uint16_t length = ((uint16_t *) (&memory[func+1]))[0];
         run_code(&memory[func+3], length, false);
+        result = pop(argstack);
+        // assume for now all args are taken
+        n = 0;
     }
+
+    if (n != 0) printf("WARN: %d leftover args\n", n);
+    drop(argstack, num_args);
+    push(argstack, result);
 }
 
 void run_code(unsigned char * code, int length, bool toplevel) {
@@ -254,7 +277,7 @@ void run_code(unsigned char * code, int length, bool toplevel) {
                     printf("[%d] Ok.\n", pop(&argstack));
                     argstack.length = 0;
                 }
-                else run_func(pop(&argstack), value-1);
+                else run_func(&argstack, value);
                 break;
             case CMD_PUSH:
                 //printf("push %d\n", value);
@@ -298,7 +321,7 @@ int add_command(unsigned char cmd, uint32_t value, unsigned char * code, int cod
     return result;
 }
 
-void compile_postfixed(bool repl) {
+void compile(bool repl) {
     Stack countstack = { 256, 0, malloc(256) };
     Stack skipstack = {256, 0, malloc(256) };
 
@@ -307,7 +330,7 @@ void compile_postfixed(bool repl) {
     int pc = code_end;
     char buffer[256];
 
-     printf("\nREADY.\n> ");
+    printf("\nREADY.\n> ");
 
     // allow for top-level statements without brackets
     bopen(&countstack);
@@ -371,16 +394,15 @@ void compile_postfixed(bool repl) {
                     run_code(&code[pc], code_end-pc, true);
                     pc = code_end;
                 }
-                //argstack.length = 0;
                 printf("> ");
           }
 
-        } else {
+        } else if (!is_whitespace_char(ch)) {
             // printf("Label\n");
             int i=0;
             while (!is_whitespace_char(ch) && !is_bracket_char(ch) && ch != ';') { buffer[i++] = ch; ch = getchar(); }
             buffer[i++] = 0;
-            // push(&argstack, lookup_variable(unique_string(buffer)));
+            //printf("Label is: '%s'\n", buffer);
             code_end = add_command(CMD_REF, unique_string(buffer), code, code_end);
             count(&countstack, 1);
             if (!is_whitespace_char(ch) || (countstack.length == 1 && ch == '\n')) continue; // so that superfluous 'ch' is processed in next round
@@ -421,5 +443,5 @@ int main (int argc, char ** argv) {
     printf("\n");
 
     ls();
-    compile_postfixed(true);
+    compile(true);
 }

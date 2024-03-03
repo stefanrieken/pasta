@@ -24,6 +24,16 @@ uint16_t peek(Stack * stack) {
     return stack->values[stack->length-1];
 }
 
+uint16_t item(Stack * stack, int i) {
+    if(stack->length < i) { printf("Stack underflow!\n"); return 0; }
+    return stack->values[stack->length-i];
+}
+
+void drop(Stack * stack, int n) {
+    if(stack->length < n) { printf("Stack underflow!\n"); return; }
+    stack->length -= n;
+}
+
 // Bracket counting uses the stack differently:
 void bopen(Stack * stack) {
     if(stack->length >= stack->size) { printf("Stack overflow!\n"); return; }
