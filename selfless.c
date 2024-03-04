@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <unistd.h>
 
 #include "stack.h"
 #include "base.h"
@@ -106,9 +107,9 @@ static inline
 bool is_whitespace_char(int ch) {
     return ch == ' ' || ch == '\t' || ch == '\r' || ch == '\n';
 }
-int next_non_whitespace_char(int until) {
-    int ch = getchar();
-    while (ch != until && is_whitespace_char(ch)) ch = getchar();
+int next_non_whitespace_char(FILE * infile, int until) {
+    int ch = fgetc(infile);
+    while (ch != until && is_whitespace_char(ch)) ch = fgetc(infile);
     return ch;
 }
 
@@ -128,7 +129,7 @@ int next_non_whitespace_char(int until) {
 
 Stack argstack;
 
-void run_code(unsigned char * code, int length, bool toplevel);
+void run_code(unsigned char * code, int length, bool toplevel, bool from_stdin);
 
 char * cmds[] = { "eval", "push", "ref", "skip" };
 void print_asm(unsigned char * code, int code_end) {
@@ -157,7 +158,7 @@ void run_func(uint16_t func, uint16_t num_args) {
     } else {
         // 'type' is actually a skip_code instruction
         uint16_t length = ((uint16_t *) (&memory[func+1]))[0];
-        run_code(&memory[func+3], length, false);
+        run_code(&memory[func+3], length, false, false);
         result = pop(&argstack);
         // assume for now all args are taken
     }
@@ -166,7 +167,7 @@ void run_func(uint16_t func, uint16_t num_args) {
     push(&argstack, result);
 }
 
-void run_code(unsigned char * code, int length, bool toplevel) {
+void run_code(unsigned char * code, int length, bool toplevel, bool from_stdin) {
     int saved_vars_end = vars_end;
     int saved_argstack = argstack.length;
 
@@ -182,7 +183,9 @@ void run_code(unsigned char * code, int length, bool toplevel) {
             case CMD_EVAL:
                 //printf("eval %d\n", value);
                 if(value == 0) { // clear argstack at end of line
-                    printf("[%d] Ok.\n", pop(&argstack));
+                    // Show expression rsult status if file is stdin,
+                    // even if it is piped input
+                    if(from_stdin) printf("[%d] Ok.\n", pop(&argstack));
                     argstack.length = 0;
                 }
                 else run_func(item(&argstack, value), value);
@@ -232,7 +235,9 @@ int add_command(unsigned char cmd, uint32_t value, unsigned char * code, int cod
 char * escapes = "nrtfe";
 char * ctrlchars = "\n\r\t\f\e";
 
-void compile(bool repl) {
+void parse(FILE * infile, bool repl) {
+    bool interactive = isatty(fileno(infile));
+
     Stack countstack = { 256, 0, malloc(256) };
     Stack skipstack = {256, 0, malloc(256) };
 
@@ -241,19 +246,26 @@ void compile(bool repl) {
     int pc = code_end;
     char buffer[256];
 
-    printf("\nREADY.\n> ");
+    if(interactive)
+        printf("\nREADY.\n> ");
 
     // allow for top-level statements without brackets
     bopen(&countstack);
-    int ch = next_non_whitespace_char('\n');
+    int ch = next_non_whitespace_char(infile, '\n');
 
     while (ch != EOF) {
+        if (ch == '#') {
+            // skip comments
+            do { ch = fgetc(infile); } while (ch != '\n');
+            ch = next_non_whitespace_char(infile, '\n');
+        }
+
         if (ch >='0' && ch <= '9') {
             // printf("Parsing int\n");
             int result = 0;
             do {
                 result = (result * 10) + (ch-'0');
-                ch = getchar();
+                ch = fgetc(infile);
             } while(ch >= '0' && ch <= '9');
             code_end = add_command(CMD_PUSH, result, code, code_end);
             count(&countstack, 1);
@@ -261,9 +273,9 @@ void compile(bool repl) {
         } else if (ch=='\"') {
             int i = 0;
             do {
-                ch = getchar();
+                ch = fgetc(infile);
 	        if (ch == '\\') {
-	          ch = getchar();
+                  ch = fgetc(infile);
 	          for (int i=0; i<strlen(escapes); i++)
 		    if (escapes[i] == ch) { ch = ctrlchars[i]; break; }
 	        }
@@ -295,7 +307,7 @@ void compile(bool repl) {
             bopen(&countstack);
         } else if (ch == ')' || (countstack.length == 1 && ch == '\n')) {
             // printf("Num args at level %d: %d\n", countstack.length, peek(&countstack));
-            if (ch == '\n' && peek(&countstack) == 0) { ch = next_non_whitespace_char('\n'); continue; }
+            if (ch == '\n' && peek(&countstack) == 0) { ch = next_non_whitespace_char(infile, '\n'); continue; }
             uint16_t num_args = bclose(&countstack);//-1;
             if (num_args > 0) {
                 if (ch != '\n') { count(&countstack, 1); } // count return value from previous expr
@@ -308,16 +320,18 @@ void compile(bool repl) {
                 code_end = add_command(CMD_EVAL, 0, code, code_end);
                 //print_asm(&code[main_start], code_end-main_start);
                 if (repl) {
-                    run_code(&code[pc], code_end-pc, true);
+                    run_code(&code[pc], code_end-pc, true, infile == stdin);
+                    //uint16_t result = peek(&argstack);
+                    if (interactive && argstack.length > 0) printf("[%d] Ok.\n", peek(&argstack));
                     pc = code_end;
                 }
-                printf("> ");
+                if(interactive) printf("> ");
           }
 
         } else if (!is_whitespace_char(ch)) {
             // printf("Label\n");
             int i=0;
-            while (!is_whitespace_char(ch) && !is_bracket_char(ch) && ch != ';') { buffer[i++] = ch; ch = getchar(); }
+            while (!is_whitespace_char(ch) && !is_bracket_char(ch) && ch != ';') { buffer[i++] = ch; ch = fgetc(infile); }
             buffer[i++] = 0;
             //printf("Label is: '%s'\n", buffer);
             code_end = add_command(CMD_REF, unique_string(buffer), code, code_end);
@@ -325,7 +339,7 @@ void compile(bool repl) {
             if (!is_whitespace_char(ch) || (countstack.length == 1 && ch == '\n')) continue; // so that superfluous 'ch' is processed in next round
         }
 
-        ch = next_non_whitespace_char('\n');
+        ch = next_non_whitespace_char(infile, '\n');
     }
 }
 
@@ -347,11 +361,17 @@ int main (int argc, char ** argv) {
     register_base_prims();
     register_int_prims();
 
-    printf("Known strings:");
-    int i = STRING_START;
-    while(memory[i] != 0) { printf(" %s", &memory[i+1]); i += memory[i]; }
-    printf("\n");
+    FILE * infile = stdin;
+    if(argc > 1) {
+        infile = fopen(argv[1], "r");
+    } else if (isatty(fileno(stdin))) {
+        printf("Known strings:");
+        int i = STRING_START;
+        while(memory[i] != 0) { printf(" %s", &memory[i+1]); i += memory[i]; }
+        printf("\n");
+        ls();
+    }
 
-    ls();
-    compile(true);
+    parse(infile, true);
+    if (infile != stdin) fclose(infile);
 }

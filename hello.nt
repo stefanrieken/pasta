@@ -1,6 +1,9 @@
+#!/path/to/selfless
+
 define "hello" {
     args "name";
     prints "Hello, " name "!\n"
 }
 
 hello "world"
+
