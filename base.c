@@ -10,6 +10,7 @@ enum {
     PRIM_PRINT,
     PRIM_PRINTS,
     PRIM_LS,
+    PRIM_STRINGS,
     PRIM_CODE,
     PRIM_IF,
     PRIM_DEFINE,
@@ -37,6 +38,10 @@ uint16_t base_prim_group_cb(uint8_t prim, uint16_t n) {
                 break;
             case PRIM_LS:
                 ls();
+                result = 0;
+                break;
+            case PRIM_STRINGS:
+                strings();
                 result = 0;
                 break;
             case PRIM_CODE:
@@ -92,6 +97,7 @@ void register_base_prims() {
     add_variable("print", add_primitive(group | PRIM_PRINT));
     add_variable("prints", add_primitive(group | PRIM_PRINTS));
     add_variable("ls", add_primitive(group | PRIM_LS));
+    add_variable("strings", add_primitive(group | PRIM_STRINGS));
     add_variable("code", add_primitive(group | PRIM_CODE));
     add_variable("if", add_primitive(group | PRIM_IF));
     add_variable("define", add_primitive(group | PRIM_DEFINE));

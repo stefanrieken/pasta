@@ -59,6 +59,13 @@ void ls() {
     printf("\n");
 }
 
+void strings() {
+    printf("Known strings:");
+    int i = STRING_START;
+    while(memory[i] != 0) { printf(" %s", &memory[i+1]); i += memory[i]; }
+    printf("\n");
+}
+
 uint16_t add_var(uint16_t name, uint16_t value) {
     if (vars_end >= VARS_START+MAX_VARS) { printf("Variable overflow!\n"); return 0; }
     Variable * var = (Variable *) &memory[vars_end];
@@ -365,10 +372,7 @@ int main (int argc, char ** argv) {
     if(argc > 1) {
         infile = fopen(argv[1], "r");
     } else if (isatty(fileno(stdin))) {
-        printf("Known strings:");
-        int i = STRING_START;
-        while(memory[i] != 0) { printf(" %s", &memory[i+1]); i += memory[i]; }
-        printf("\n");
+        strings();
         ls();
     }
 

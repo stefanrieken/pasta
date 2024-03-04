@@ -5,7 +5,7 @@ uint16_t add_var(uint16_t name, uint16_t value);
 
 void print_asm(unsigned char * code, int code_end);
 void ls();
-
+void strings();
 
 typedef struct __attribute__((__packed__)) Variable {
     uint16_t name;
