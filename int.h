@@ -1,0 +1,1 @@
+void register_int_prims();

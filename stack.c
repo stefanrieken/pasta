@@ -30,7 +30,7 @@ uint16_t item(Stack * stack, int i) {
 }
 
 void drop(Stack * stack, int n) {
-    if(stack->length < n) { printf("Stack underflow!\n"); return; }
+    if(stack->length < n) { printf("Stack underflow! %d\n", stack->length); return; }
     stack->length -= n;
 }
 

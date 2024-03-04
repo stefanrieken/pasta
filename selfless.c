@@ -5,21 +5,11 @@
 #include <stdbool.h>
 
 #include "stack.h"
+#include "base.h"
+#include "int.h"
+#include "selfless.h"
 
 uint8_t * memory;
-
-#define MAX_MEM (64 * 1024)
-
-// The parse buffer is not presently used,
-// but may be re-introduced when parsing prefixed code.
-// (alternative: just reverse args to each expression as we parse it)
-#define PARSE_BUFFER_START (256)
-
-#define CODE_START (1 * 1024)
-#define MAX_PARSE_BUFFER (CODE_START - PARSE_BUFFER_START)
-
-#define STRING_START (4 * 1024)
-#define MAX_CODE (STRING_START - CODE_START)
 
 int code_end;
 // We now compile code directly to memory as one big main function,
@@ -28,30 +18,11 @@ int code_end;
 // like we have for blocks (and primitive references are typed with a zero).
 int main_start;
 
-#define VARS_START 8 * 1024
-#define MAX_STRING (VARS_START - STRING_START)
-
-#define MAX_VARS (MAX_MEM - VARS_START)
-
 int vars_end;
 
-// Primitive defs
-#define PRIM_PLUS 40
-#define PRIM_EQ 41
-#define PRIM_HELLO 42
-#define PRIM_PRINT 43
-#define PRIM_PRINTS 44
-#define PRIM_LS 45
-#define PRIM_CODE 46
-#define PRIM_IF 47
-#define PRIM_DEFINE 48
-#define PRIM_ARGS 49
-#define PRIM_REMAINDER 50
-
-typedef struct __attribute__((__packed__)) Variable {
-    uint16_t name;
-    uint16_t value; // TODO do we assume all types' values fit in 16 bits?
-} Variable;
+uint8_t prim_group_len;
+#define MAX_PRIM_GROUPS 8
+PrimGroupCb prim_groups[MAX_PRIM_GROUPS];
 
 /** 
  * Find string in unique string list, or add it.
@@ -76,7 +47,16 @@ uint16_t unique_string(char * string) {
     return result;
 }
 
-#define str(v) ((char *) &memory[STRING_START+v])
+void ls() {
+    printf("Known variables:");
+    int i = VARS_START;
+    while(i < vars_end) {
+        Variable * var = (Variable *) &memory[i];
+        printf(" %s (%d)", str(var->name), var->value);
+        i += sizeof(Variable);
+    }
+    printf("\n");
+}
 
 uint16_t add_var(uint16_t name, uint16_t value) {
     if (vars_end >= VARS_START+MAX_VARS) { printf("Variable overflow!\n"); return 0; }
@@ -102,17 +82,11 @@ Variable * lookup_variable(uint16_t name) {
     return (Variable *) &memory[VARS_START]; // false
 }
 
-void ls() {
-    printf("Known variables:");
-    int i = VARS_START;
-    while(i < vars_end) {
-        Variable * var = (Variable *) &memory[i];
-        printf(" %s (%d)", str(var->name), var->value);
-        i += sizeof(Variable);
-    }
-    printf("\n");
+uint8_t add_primitive_group(PrimGroupCb cb) {
+    uint8_t result = prim_group_len << 5;
+    prim_groups[prim_group_len++] = cb;
+    return result;
 }
-
 
 uint16_t add_primitive(uint16_t prim) {
     //printf("Add prim %d at %d\n", prim, code_end);
@@ -171,96 +145,25 @@ void print_asm(unsigned char * code, int code_end) {
     }
 }
 
-void run_func(Stack * argstack, uint16_t num_args) {
-    uint16_t n = num_args;
-    uint16_t func = item(argstack, n--);
-    uint8_t type;
-
-    start_run_func:
-
-    type = memory[func];
-    uint16_t temp;
+void run_func(uint16_t func, uint16_t num_args) {
+    uint8_t type = memory[func];
     uint16_t result = 0;
 
     if (type == 0) { // signals primitive func
         uint8_t prim = memory[func+1];
-        switch(prim) {
-            case PRIM_PLUS:
-                temp = item(argstack, n--);
-                result = temp + item(argstack, n--);
-                break;
-            case PRIM_EQ:
-                temp = item(argstack, n--);
-                result = temp == item(argstack, n--);
-               break;
-            case PRIM_HELLO:
-                printf("Hello from primitive #%d\n", prim);
-                result = 0;
-               break;
-            case PRIM_PRINT:
-                while(n != 0) { temp = item(argstack, n--); printf("%d ", temp); }
-                printf("\n");
-                result = temp;
-                break;
-            case PRIM_PRINTS:
-                while(n != 0) { temp = item(argstack, n--); printf("%s", (char *) &memory[STRING_START + temp]); }
-                result = temp;
-                break;
-            case PRIM_LS:
-                ls();
-                result = 0;
-                break;
-            case PRIM_CODE:
-                print_asm(&memory[CODE_START+main_start], code_end-main_start);
-                result = 0;
-                break;
-            case PRIM_IF:
-                temp = item(argstack, n--);
-                func = item(argstack, n--);
-                drop(argstack, num_args);
-                num_args = 0; n = 0;
-                if(temp) {
-                    goto start_run_func;
-                }
-                else result = 0;
-                break;
-            case PRIM_DEFINE:
-                temp = item(argstack, n--);
-                add_var(temp, item(argstack, n--)); // return the value
-                break;
-            case PRIM_ARGS:
-                // As we call another function to pop our own args,
-                // the callstack is a bit crowded, e.g.: "y" "x" 43 42
-                // So define args first, then pop values
-                temp = vars_end;
-                for (int i=0; i<n;i++) add_var(item(argstack, n-i), 0);
-                drop(argstack, num_args);
-                for (int i=0; i<n;i++) ((Variable *) (&memory[temp]))[i].value = item(argstack, n-i);
-                n -= num_args-1;
-                result = 0;
-                break;
-            case PRIM_REMAINDER:
-                printf("TODO work out arrays & use for remainder args\n");
-                break;
-            default:
-                // It is very easy to come here by triggering the
-                // evaluation of a random value as a function.
-                printf("Invalid function reference: %d\n", func);
-                result = 0;
-                break;
-        }
+        uint8_t group = (prim >> 5) & 0b111;
+        // invoke primitive group callback
+        result = prim_groups[group](prim & 0b11111, num_args-1);
     } else {
         // 'type' is actually a skip_code instruction
         uint16_t length = ((uint16_t *) (&memory[func+1]))[0];
         run_code(&memory[func+3], length, false);
-        result = pop(argstack);
+        result = pop(&argstack);
         // assume for now all args are taken
-        n = 0;
     }
 
-    if (n != 0) printf("WARN: %d leftover args\n", n);
-    drop(argstack, num_args);
-    push(argstack, result);
+    drop(&argstack, num_args);
+    push(&argstack, result);
 }
 
 void run_code(unsigned char * code, int length, bool toplevel) {
@@ -282,7 +185,7 @@ void run_code(unsigned char * code, int length, bool toplevel) {
                     printf("[%d] Ok.\n", pop(&argstack));
                     argstack.length = 0;
                 }
-                else run_func(&argstack, value);
+                else run_func(item(&argstack, value), value);
                 break;
             case CMD_PUSH:
                 //printf("push %d\n", value);
@@ -440,17 +343,9 @@ int main (int argc, char ** argv) {
     add_variable("false", 0);
     add_variable("true", 1);
     unique_string("+"); // test (de)duplication of strings
-    add_variable("+", add_primitive(PRIM_PLUS));
-    add_variable("=", add_primitive(PRIM_EQ));
-    add_variable("hi", add_primitive(PRIM_HELLO));
-    add_variable("print", add_primitive(PRIM_PRINT));
-    add_variable("prints", add_primitive(PRIM_PRINTS));
-    add_variable("ls", add_primitive(PRIM_LS));
-    add_variable("code", add_primitive(PRIM_CODE));
-    add_variable("if", add_primitive(PRIM_IF));
-    add_variable("define", add_primitive(PRIM_DEFINE));
-    add_variable("args", add_primitive(PRIM_ARGS));
-    add_variable("remainder", add_primitive(PRIM_REMAINDER));
+
+    register_base_prims();
+    register_int_prims();
 
     printf("Known strings:");
     int i = STRING_START;
