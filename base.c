@@ -18,7 +18,8 @@ enum {
     PRIM_REMAINDER
 };
 
-uint16_t base_prim_group_cb(uint8_t prim, uint16_t n) {
+uint16_t base_prim_group_cb(uint8_t prim) {
+    uint16_t n = peek(&argstack);
     uint16_t temp;
     uint16_t result = 0;
 
@@ -28,12 +29,12 @@ uint16_t base_prim_group_cb(uint8_t prim, uint16_t n) {
                 result = 0;
                break;
             case PRIM_PRINT:
-                while(n != 0) { temp = item(&argstack, n--); printf("%d ", temp); }
+                while(n != 1) { temp = item(&argstack, n--); printf("%d ", temp); }
                 printf("\n");
                 result = temp;
                 break;
             case PRIM_PRINTS:
-                while(n != 0) { temp = item(&argstack, n--); printf("%s", (char *) &memory[STRING_START + temp]); }
+                while(n != 1) { temp = item(&argstack, n--); printf("%s", (char *) &memory[STRING_START + temp]); }
                 result = temp;
                 break;
             case PRIM_LS:
@@ -51,12 +52,17 @@ uint16_t base_prim_group_cb(uint8_t prim, uint16_t n) {
             case PRIM_IF:
                 temp = item(&argstack, n--);
                 uint16_t func = item(&argstack, n--);
-                n = 0;
                 if(temp) {
-                    run_func(func, 0);
+                    push(&argstack, 0); // indicate that there are zero args to the block
+                    run_func(func);
                     result = pop(&argstack);
-                }
-                else result = 0;
+                } else if (n > 1) {
+                    func = item(&argstack, n--);
+                    push(&argstack, 0); // indicate that there are zero args to the block
+                    run_func(func);
+                    result = pop(&argstack);
+                } else result = 0;
+                n = 1;
                 break;
             case PRIM_DEFINE:
                 temp = item(&argstack, n--);
@@ -64,17 +70,24 @@ uint16_t base_prim_group_cb(uint8_t prim, uint16_t n) {
                 break;
             case PRIM_ARGS:
                 // As we call another function to pop our own args,
-                // the callstack is a bit crowded, e.g.: "y" "x" 43 42
+                // the callstack is a bit crowded, e.g.: 2 "y" "x" <prim_args> 2 43 42
                 // So define args first, then pop values
                 temp = vars_end;
-                for (int i=0; i<n;i++) add_var(item(&argstack, n-i), 0);
-                drop(&argstack, n+1);
-                for (int i=0; i<n;i++) ((Variable *) (&memory[temp]))[i].value = item(&argstack, n-i);
+                for (int i=0; i<n-1;i++) add_var(item(&argstack, n-i), 0);
+                drop(&argstack, n+1); // include prim func reference, n
+                for (int i=0; i<n-1;i++) ((Variable *) (&memory[temp]))[i].value = item(&argstack, n-i);
                 // leave the second drop to run_func
-                n = 0;
+                n = 1;
                 result = 0;
                 break;
             case PRIM_REMAINDER:
+                // Any remaining args are now on the argstack like so:
+                // remaining1 remaining2 named1 named2 num_args prim_remainder n
+                // 1 "z" <prim_remainder> num_args remaining2 remaining1 named2 named1
+                //
+                // In other words, (as our stack actually goes up), there is an array of
+                // leftover values on the stack which is in right order, but is lacking
+                // the right count at the right place; also, stack values are temporal.
                 printf("TODO work out arrays & use for remainder args\n");
                 break;
             default:
@@ -85,7 +98,7 @@ uint16_t base_prim_group_cb(uint8_t prim, uint16_t n) {
                 break;
         }
 
-        if (n != 0) printf("WARN: %d leftover args\n", n);
+        if (n != 1) printf("WARN: %d leftover args\n", n);
 
         return result;
 }

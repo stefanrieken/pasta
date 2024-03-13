@@ -96,7 +96,7 @@ water).
 the second one marking further arguments still to follow in the input stream,
 which may be skippable, similar to current blocks. The origins of this truly
 'mixed-fixed' approach to conditional evaluation lie with the Forth programming
-language, which is considered to be famously postfixed -- go figure.)
+language, which is famously considered postfixed -- go figure.)
 
 ## Argument syntax
 LISP's lambda syntax is aimed at runtime function creation; in Selfless it

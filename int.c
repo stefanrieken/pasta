@@ -14,10 +14,10 @@ enum {
     PRIM_EQ
 };
 
-uint16_t int_prim_group_cb(uint8_t prim, uint16_t n) {
+uint16_t int_prim_group_cb(uint8_t prim) {
+    uint16_t n = peek(&argstack);
     uint16_t val = item(&argstack, n--);
     uint16_t result = 0;
-
         switch(prim) {
             case PRIM_PLUS:
                 result = val + item(&argstack, n--);
@@ -43,7 +43,7 @@ uint16_t int_prim_group_cb(uint8_t prim, uint16_t n) {
                 break;
         }
 
-        if (n != 0) printf("WARN: %d leftover args\n", n);
+        if (n != 1) printf("WARN: %d leftover args\n", n);
 
         return result;
 }

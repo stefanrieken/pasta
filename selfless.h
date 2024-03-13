@@ -1,4 +1,4 @@
-void run_func(uint16_t func, uint16_t num_args);
+void run_func(uint16_t func);
 
 uint16_t add_variable(char * name, uint16_t value);
 uint16_t add_var(uint16_t name, uint16_t value);
@@ -19,7 +19,7 @@ extern Stack argstack;
 //
 // Primitives
 //
-typedef uint16_t (*PrimGroupCb)(uint8_t prim, uint16_t num_args);
+typedef uint16_t (*PrimGroupCb)(uint8_t prim);
 
 uint8_t add_primitive_group(PrimGroupCb cb);
 uint16_t add_primitive(uint16_t prim);

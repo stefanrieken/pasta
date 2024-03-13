@@ -153,15 +153,16 @@ void print_asm(unsigned char * code, int code_end) {
     }
 }
 
-void run_func(uint16_t func, uint16_t num_args) {
+void run_func(uint16_t func) {
     uint8_t type = memory[func];
+    uint16_t num_args = peek(&argstack);
     uint16_t result = 0;
 
     if (type == 0) { // signals primitive func
         uint8_t prim = memory[func+1];
         uint8_t group = (prim >> 5) & 0b111;
         // invoke primitive group callback
-        result = prim_groups[group](prim & 0b11111, num_args-1);
+        result = prim_groups[group](prim & 0b11111);
     } else {
         // 'type' is actually a skip_code instruction
         uint16_t length = ((uint16_t *) (&memory[func+1]))[0];
@@ -170,7 +171,7 @@ void run_func(uint16_t func, uint16_t num_args) {
         // assume for now all args are taken
     }
 
-    drop(&argstack, num_args);
+    drop(&argstack, num_args+1); // also drop 'num_args' value itself
     push(&argstack, result);
 }
 
@@ -194,8 +195,10 @@ void run_code(unsigned char * code, int length, bool toplevel, bool from_stdin) 
                     // even if it is piped input
                     if(from_stdin) printf("[%d] Ok.\n", pop(&argstack));
                     argstack.length = 0;
+                } else {
+                    push(&argstack, value); // push n args
+                    run_func(item(&argstack, value+1));
                 }
-                else run_func(item(&argstack, value), value);
                 break;
             case CMD_PUSH:
                 //printf("push %d\n", value);
@@ -264,7 +267,7 @@ void parse(FILE * infile, bool repl) {
         if (ch == '#') {
             // skip comments
             do { ch = fgetc(infile); } while (ch != '\n');
-            ch = next_non_whitespace_char(infile, '\n');
+            //ch = next_non_whitespace_char(infile, '\n');
         }
 
         if (ch >='0' && ch <= '9') {
