@@ -11,6 +11,10 @@ enum {
     PRIM_TIMES,
     PRIM_DIV,
     PRIM_REST,
+    PRIM_LT,
+    PRIM_LTE,
+    PRIM_GT,
+    PRIM_GTE,
     PRIM_EQ
 };
 
@@ -34,6 +38,18 @@ uint16_t int_prim_group_cb(uint8_t prim) {
             case PRIM_REST:
                 result = val % item(&argstack, n--);
                 break;
+            case PRIM_LT:
+                result = val < item(&argstack, n--);
+                break;
+            case PRIM_LTE:
+                result = val <= item(&argstack, n--);
+                break;
+            case PRIM_GT:
+                result = val > item(&argstack, n--);
+                break;
+            case PRIM_GTE:
+                result = val >= item(&argstack, n--);
+                break;
             case PRIM_EQ:
                 result = val == item(&argstack, n--);
                 break;
@@ -55,6 +71,10 @@ void register_int_prims() {
     add_variable("-", add_primitive(group | PRIM_MINUS));
     add_variable("*", add_primitive(group | PRIM_TIMES));
     add_variable("/", add_primitive(group | PRIM_DIV));
-    add_variable("=", add_primitive(group | PRIM_EQ));
     add_variable("%", add_primitive(group | PRIM_REST));
+    add_variable("<", add_primitive(group | PRIM_LT));
+    add_variable("<=", add_primitive(group | PRIM_LTE));
+    add_variable(">", add_primitive(group | PRIM_GT));
+    add_variable(">=", add_primitive(group | PRIM_GTE));
+    add_variable("=", add_primitive(group | PRIM_EQ));
 }

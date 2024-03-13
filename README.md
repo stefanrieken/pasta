@@ -47,6 +47,10 @@ It is even possible to run an anonymous variant:
 
         { args "x"; ls } 42; ls
 
+## Loops
+See loop.nt for a demonstration of the 'loop' function. The function is simple,
+versatile and prevents obligatory tail call optimization.
+
 ## Simplifications
 Respective to (modern) LISP, Selfless introduces many simplifications, aiming
 at small-footprint execution:
@@ -58,7 +62,7 @@ at small-footprint execution:
 - Zero backtracking during parsing
 - No 'special forms'; instead, explicitly use "strings", { blocks }
 - Static block definition; no runtime transformation of data into code
-- Also employ function syntax for 'let' scoping: ({args "x" (+ x x)} 21)
+- Also employ function syntax for 'let' scoping: ({args "x"; + x x} 21)
 
 ## Compiling
 Code is compiled into a 4-command bytecode:

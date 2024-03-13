@@ -80,6 +80,18 @@ uint16_t add_variable(char * name, uint16_t value) {
     return add_var(unique_string(name), value);
 }
 
+uint16_t set_var(uint16_t name, uint16_t value) {
+    int i = vars_end-sizeof(Variable);
+    Variable * var = (Variable *) &memory[i];
+    while(var->name != name) {
+      i -= sizeof(Variable);
+      if (i<VARS_START) { printf("Var not found: %d\n", name); return 0; }
+      var = (Variable *) &memory[i];
+    }
+    var->value = value;
+    return i;
+}
+
 Variable * lookup_variable(uint16_t name) {
     for (int i=VARS_START;i<vars_end;i+=sizeof(Variable)) {
         Variable * var = (Variable *) &memory[i];
@@ -304,7 +316,9 @@ void parse(FILE * infile, bool repl) {
             // Assuming we want 'separator-separated' commands inside {},
             // and assuming there is an expression without an end separator,
             // finalize that expression:
-            code_end = add_command(CMD_EVAL, num_args, code, code_end);
+            if (!(ch == '}' && num_args == 0)) // This prevents a final ';' from clearing the return value by adding EVAL 0
+                code_end = add_command(CMD_EVAL, num_args, code, code_end);
+//            if (ch == '}') printf("Num args: %d\n", num_args);
 
             if (ch == '}') {
                 int where = bclose(&skipstack);

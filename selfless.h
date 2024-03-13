@@ -2,6 +2,7 @@ void run_func(uint16_t func);
 
 uint16_t add_variable(char * name, uint16_t value);
 uint16_t add_var(uint16_t name, uint16_t value);
+uint16_t set_var(uint16_t name, uint16_t value);
 
 void print_asm(unsigned char * code, int code_end);
 void ls();
