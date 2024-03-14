@@ -1,0 +1,37 @@
+# This program loops over all 64k of memory and tells for
+# every 512 byte block whether or not part of it is in use,
+# showing all of memory in a 16*8 ascii art 'square'.
+
+
+prints "\nMemory usage in 512k blocks:\n\n";
+define "i" 0;
+define "used" false;
+
+loop {
+    set "used" (| used (!(= 0 (peekb i))));
+
+#    if (= 63 (% i 64)) {
+    if (= 511 (% i 512)) {
+        # print i;
+        if used {
+            prints "#"
+        } {
+            prints "."
+        };
+
+        set "used" false;
+
+        if (= 8191 (% i 8192)) {
+            prints " ";
+            print i;
+            # prints "\n"
+        }
+
+    };
+
+    set "i" (+ 1 i);
+    
+    ! (= i 0) # i loops back to 0 after 65535
+};
+
+ls

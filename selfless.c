@@ -263,7 +263,7 @@ void parse(FILE * infile, bool repl) {
     Stack countstack = { 256, 0, malloc(256) };
     Stack skipstack = {256, 0, malloc(256) };
 
-    uint8_t * code = &memory[CODE_START];
+    uint8_t * code = memory; //&memory[CODE_START];
     main_start = code_end;
     int pc = code_end;
     char buffer[256];

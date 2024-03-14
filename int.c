@@ -15,7 +15,10 @@ enum {
     PRIM_LTE,
     PRIM_GT,
     PRIM_GTE,
-    PRIM_EQ
+    PRIM_EQ,
+    PRIM_AND,
+    PRIM_OR,
+    PRIM_XOR
 };
 
 uint16_t int_prim_group_cb(uint8_t prim) {
@@ -53,6 +56,15 @@ uint16_t int_prim_group_cb(uint8_t prim) {
             case PRIM_EQ:
                 result = val == item(&argstack, n--);
                 break;
+            case PRIM_AND:
+                result = val & item(&argstack, n--);
+                break;
+            case PRIM_OR:
+                result = val | item(&argstack, n--);
+                break;
+            case PRIM_XOR:
+                result = val ^ item(&argstack, n--);
+                break;
             default:
                 printf("Invalid primitive reference: %d\n", prim);
                 result = 0;
@@ -77,4 +89,7 @@ void register_int_prims() {
     add_variable(">", add_primitive(group | PRIM_GT));
     add_variable(">=", add_primitive(group | PRIM_GTE));
     add_variable("=", add_primitive(group | PRIM_EQ));
+    add_variable("&", add_primitive(group | PRIM_AND));
+    add_variable("|", add_primitive(group | PRIM_OR));
+    add_variable("^", add_primitive(group | PRIM_XOR));
 }

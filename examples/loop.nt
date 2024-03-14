@@ -1,0 +1,21 @@
+# Like the 'args' syntax, 'loop' was born from a need to keep things simple,
+# and it works surprisingly well: the block argument is repeated until it
+# returns a false value (0).
+
+
+# This acts like a 'do ... while' loop:
+
+define "i" 1;
+loop {
+    print i;
+    set "i" (+ 1 i);
+    <= i 10
+}
+
+# This acts like a 'while' loop:
+
+set "i" 1;
+loop {<= i 10} {
+    print i;
+    set "i" (+ i 1)
+}

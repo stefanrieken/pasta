@@ -19,7 +19,8 @@ enum {
     PRIM_SET,
     PRIM_ARGS,
     PRIM_REMAINDER,
-    PRIM_NOT
+    PRIM_NOT,
+    PRIM_PEEKB
 };
 
 uint16_t base_prim_group_cb(uint8_t prim) {
@@ -127,6 +128,10 @@ uint16_t base_prim_group_cb(uint8_t prim) {
                 result = item(&argstack, n--);
                 result = result ? 0 : 1;
                 break;
+            case PRIM_PEEKB:
+                temp = item(&argstack, n--);
+                result = memory[temp];
+                break;
             default:
                 // It is very easy to come here by triggering the
                 // evaluation of a random value as a function.
@@ -157,4 +162,5 @@ void register_base_prims() {
     add_variable("args", add_primitive(group | PRIM_ARGS));
     add_variable("remainder", add_primitive(group | PRIM_REMAINDER));
     add_variable("!", add_primitive(group | PRIM_NOT));
+    add_variable("peekb", add_primitive(group | PRIM_PEEKB));
 }
