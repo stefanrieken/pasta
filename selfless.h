@@ -1,3 +1,6 @@
+#include <stdint.h>
+#include "stack.h"
+
 void run_func(uint16_t func);
 
 uint16_t add_variable(char * name, uint16_t value);
@@ -44,3 +47,9 @@ extern int main_start;
 
 #define MAX_VARS (MAX_MEM - VARS_START)
 extern int vars_end;
+
+//
+// Callbacks
+//
+void pasta_init();
+void * mainloop(void * arg);

@@ -2,13 +2,15 @@ CFLAGS=-Wall -Wunused -ffunction-sections -fdata-sections
 OBJS=stack.o base.o int.o selfless.o
 
 %.o: %.c
-	$(CC) $(CFLAGS) -c $< -o $@
+	$(CC) $(CFLAGS) -c $< -o $@ `pkg-config --libs --cflags cairo gdk-3.0 gtk+-3.0`
 
-all: $(OBJS)
-	$(CC) $(CFLAGS) $(OBJS) -o selfless
+all: selfless tricolore
 
-tricolore: $(OBJS) bitmap.c
-	$(CC) $(CFLAGS) bitmap.c -o $@ `pkg-config --libs --cflags cairo gdk-3.0 gtk+-3.0`
+selfless: $(OBJS) main.o
+	$(CC) $(CFLAGS) $^ -o $@
+
+tricolore: $(OBJS) bitmap.o tricolore.o
+	$(CC) $(CFLAGS) $^ -o $@ `pkg-config --libs --cflags cairo gdk-3.0 gtk+-3.0`
 
 clean:
 	rm -rf *.o selfless

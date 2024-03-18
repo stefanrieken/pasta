@@ -1,7 +1,6 @@
 #include <stdint.h>
 #include <stdio.h>
 
-#include "stack.h"
 #include "selfless.h"
 
 // Base primitive defs

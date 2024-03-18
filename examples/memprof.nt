@@ -10,7 +10,7 @@ loop {
     set "used" (| used (!(= 0 (getb i))));
 
 #    if (= 63 (% i 64)) {
-    if (= 511 (% i 512)) {
+    if (= 0x1FF (% i 0x200)) {
         # print i;
         if used {
             prints "#"
@@ -20,9 +20,9 @@ loop {
 
         set "used" false;
 
-        if (= 8191 (% i 8192)) {
+        if (= 0x1FFF (% i 0x2000)) {
             prints " ";
-            print i;
+            printx i;
             # prints "\n"
         }
 

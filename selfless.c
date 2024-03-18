@@ -5,10 +5,10 @@
 #include <stdbool.h>
 #include <unistd.h>
 
+#include "selfless.h"
 #include "stack.h"
 #include "base.h"
 #include "int.h"
-#include "selfless.h"
 
 uint8_t * memory;
 
@@ -380,7 +380,8 @@ void parse(FILE * infile, bool repl) {
     }
 }
 
-int main (int argc, char ** argv) {
+
+void pasta_init() {
     memory = malloc(MAX_MEM);
     memory[STRING_START] = 0;
     memory[VARS_START] = 0;
@@ -397,20 +398,27 @@ int main (int argc, char ** argv) {
 
     register_base_prims();
     register_int_prims();
+}
 
-    int i = 1;
-    while (i <argc && strcmp("-", argv[i]) != 0) {
-        FILE * infile = fopen(argv[i++], "r");
+void * mainloop(void * arg) {
+    char ** args = (char **) arg;
+
+    int i = 0;
+    while (args[i] != NULL && strcmp(args[i], "-") != 0) {
+        FILE * infile = fopen(args[i++], "r");
         parse(infile, true);
         fclose(infile);
     }
     
     // Allow interactive running even after file args using "-"
-    if (i == 1 || i < argc) {
+    if (i == 0 || (args[i] != NULL && strcmp(args[i], "-") == 0)) {
         if (isatty(fileno(stdin))) {
             strings();
             ls();
         }
         parse(stdin, true);
     }
+
+    return NULL;
 }
+

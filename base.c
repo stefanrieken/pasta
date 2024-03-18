@@ -1,7 +1,6 @@
 #include <stdint.h>
 #include <stdio.h>
 
-#include "stack.h"
 #include "selfless.h"
 
 // Base primitive defs
@@ -51,7 +50,7 @@ uint16_t base_prim_group_cb(uint8_t prim) {
             result = temp;
             break;
         case PRIM_PRINTX:
-            while(n != 1) { temp = item(&argstack, n--); printf("0x%X ", temp); }
+            while(n != 1) { temp = item(&argstack, n--); printf("%X ", temp); }
             printf("\n");
             result = temp;
             break;

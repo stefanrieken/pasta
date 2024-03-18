@@ -1,3 +1,6 @@
+#ifndef STACK_H
+#define STACK_H
+
 typedef struct Stack {
     uint16_t size;
     uint16_t length;
@@ -14,3 +17,5 @@ void drop(Stack * stack, int n);
 void bopen(Stack * stack);
 uint16_t bclose(Stack * stack);
 void count(Stack * stack, int num);
+
+#endif /* STACK_H */
