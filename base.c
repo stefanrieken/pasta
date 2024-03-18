@@ -19,8 +19,11 @@ enum {
     PRIM_SET,
     PRIM_ARGS,
     PRIM_REMAINDER,
+    PRIM_ENUM,
     PRIM_NOT,
-    PRIM_PEEKB
+    PRIM_GET_BYTE,
+    PRIM_SET_BYTE,
+    PRIM_SET_ALL_BYTE
 };
 
 uint16_t base_prim_group_cb(uint8_t prim) {
@@ -124,13 +127,33 @@ uint16_t base_prim_group_cb(uint8_t prim) {
                 // the right count at the right place; also, stack values are temporal.
                 printf("TODO work out arrays & use for remainder args\n");
                 break;
+            case PRIM_ENUM:                
+                for (int i=0; i<n-1;i++) add_var(item(&argstack, n-i), i);
+                n = 1;
+                result = 0;
+                break;
             case PRIM_NOT:
                 result = item(&argstack, n--);
                 result = result ? 0 : 1;
                 break;
-            case PRIM_PEEKB:
+            case PRIM_GET_BYTE:
                 temp = item(&argstack, n--);
+                if (n > 1) temp += item(&argstack, n--); // Allow struct indexing: get mystruct myenum
                 result = memory[temp];
+                break;
+            case PRIM_SET_BYTE:
+                temp = item(&argstack, n--);
+                if (n > 2) temp += item(&argstack, n--); // Allow struct indexing: get mystruct myenum
+                result = item(&argstack, n--);
+                memory[temp] = result;
+                break;
+            case PRIM_SET_ALL_BYTE:
+                temp = item(&argstack, n--);
+                for(int i=0; i<n-1; i++) {
+                    memory[temp+i] = item(&argstack, n-i);
+                }
+                n = 1;
+                result = 0;
                 break;
             default:
                 // It is very easy to come here by triggering the
@@ -158,9 +181,12 @@ void register_base_prims() {
     add_variable("if", add_primitive(group | PRIM_IF));
     add_variable("loop", add_primitive(group | PRIM_LOOP));
     add_variable("define", add_primitive(group | PRIM_DEFINE));
-    add_variable("set", add_primitive(group | PRIM_SET));
+    add_variable("set", add_primitive(group | PRIM_SET)); // consider: set (at "foo") 42; to re-use set as setw (or just use '=')
     add_variable("args", add_primitive(group | PRIM_ARGS));
     add_variable("remainder", add_primitive(group | PRIM_REMAINDER));
+    add_variable("enum", add_primitive(group | PRIM_ENUM));
     add_variable("!", add_primitive(group | PRIM_NOT));
-    add_variable("peekb", add_primitive(group | PRIM_PEEKB));
+    add_variable("getb", add_primitive(group | PRIM_GET_BYTE));
+    add_variable("setb", add_primitive(group | PRIM_SET_BYTE));
+    add_variable("setallb", add_primitive(group | PRIM_SET_ALL_BYTE));
 }
