@@ -398,14 +398,19 @@ int main (int argc, char ** argv) {
     register_base_prims();
     register_int_prims();
 
-    FILE * infile = stdin;
-    if(argc > 1) {
-        infile = fopen(argv[1], "r");
-    } else if (isatty(fileno(stdin))) {
-        strings();
-        ls();
+    int i = 1;
+    while (i <argc && strcmp("-", argv[i]) != 0) {
+        FILE * infile = fopen(argv[i++], "r");
+        parse(infile, true);
+        fclose(infile);
     }
-
-    parse(infile, true);
-    if (infile != stdin) fclose(infile);
+    
+    // Allow interactive running even after file args using "-"
+    if (i == 1 || i < argc) {
+        if (isatty(fileno(stdin))) {
+            strings();
+            ls();
+        }
+        parse(stdin, true);
+    }
 }
