@@ -285,10 +285,23 @@ void parse(FILE * infile, bool repl) {
         if (ch >='0' && ch <= '9') {
             // printf("Parsing int\n");
             int result = 0;
-            do {
-                result = (result * 10) + (ch-'0');
+            int radix = 10;
+            if (ch == '0') {
+               ch = fgetc(infile);
+               if(ch == 'b') { radix = 2; ch = fgetc(infile); }
+               else if(ch == 'x') { radix = 16; ch = fgetc(infile); }
+            }
+            // Allow letters for numbers 10 and higher, dependend on radix
+            int normalized = ch;
+            if (ch >= 'a' && ch <= 'z') normalized = '0'+10+(ch-'a');
+            else if (ch >= 'A' && ch <= 'Z') normalized = '0'+10+(ch-'A');
+            while(normalized >= '0' && normalized <= '0'+radix) {
+                result = (result * radix) + (normalized-'0');
                 ch = fgetc(infile);
-            } while(ch >= '0' && ch <= '9');
+                normalized = ch;
+               if (ch >= 'a' && ch <= 'z') normalized = '0'+10+(ch-'a');
+               else if (ch >= 'A' && ch <= 'Z') normalized = '0'+10+(ch-'A');
+            }
             code_end = add_command(CMD_PUSH, result, code, code_end);
             count(&countstack, 1);
             if (!is_whitespace_char(ch) || (countstack.length == 1 && ch == '\n')) continue; // so that superfluous 'ch' is processed in next round

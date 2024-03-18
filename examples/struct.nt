@@ -1,4 +1,4 @@
-define "mystruct" (* 24 1024)
+define "mystruct" 0x6000
 
 enum "x" "y" "width" "height"
 
