@@ -1,0 +1,60 @@
+# define the sprite struct
+enum "xpos" "ypos" "width" "height" "map0" "map1" "tileset" "flags"
+
+# returns sprite struct n
+define "sprite" {
+    args "n";
+    + (* 12 1024) (* n 16)
+}
+
+# Load base ascii / spritesets into memory (may be builtin)
+#load_bitmap "assets/ascii1.bmp" (tileset 0)
+#load_bitmap "assets/ascii2.bmp" (tileset 1)
+
+# Demo: write something on screen
+define "screen_spr" (sprite 0)
+define "screen" (* 30 1024)
+setallb screen_spr 0 0 255 255 (lsb screen) (msb screen) 0 0x04 # set transparent to greater than 3 =none
+
+setb screen 127 # Tricolore logo
+define "cursor" (write (+ 1 screen) "Tricolore\n")
+set "cursor" (write cursor "\nHello, world!\n")
+
+# Do a few bricks
+loop {
+    setb cursor 31;
+    set "cursor" (+ 1 cursor);
+    ! (= (% cursor 64) 0)
+}
+
+# Add a sprite
+define "sprite1" (sprite 1)
+define "tile1" (* 31 1024)
+setallb sprite1 88 0 8 8 (lsb tile1) (msb tile1) 0 0 # set zero color to be transparent
+setb tile1 21
+
+define "endpos" 15
+
+define "catwalk" {
+    draw;
+
+    loop {
+        setb sprite1 xpos (+ (getb sprite1 xpos) 1);
+        setb sprite1 ypos (+ (getb sprite1 ypos) 1);
+        draw;
+        catchup;
+        < (getb sprite1 xpos) 247
+    };
+
+    loop {
+        setb sprite1 xpos (- (getb sprite1 xpos) 1);
+        setb sprite1 ypos (- (getb sprite1 ypos) 1);
+        draw;
+        catchup;
+        > (getb sprite1 ypos) endpos
+    };
+
+    if (= endpos 15) {set "endpos" 0} {set "endpos" 15}
+}
+
+catwalk

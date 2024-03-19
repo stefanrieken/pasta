@@ -5,7 +5,7 @@
 #include <stdbool.h>
 #include <unistd.h>
 
-#include "selfless.h"
+#include "pasta.h"
 #include "stack.h"
 #include "base.h"
 #include "int.h"
@@ -30,20 +30,20 @@ PrimGroupCb prim_groups[MAX_PRIM_GROUPS];
  * @return relative pointer to string
  */
 uint16_t unique_string(char * string) {
-    int i = 0; // or absolute: i=STRING_START
-    while (memory[STRING_START+i] != 0) {
-        if (strcmp(string, (char *) (&memory[STRING_START+i+1])) == 0) return i+1;
-        i += memory[STRING_START+i]; // follow chain
-        if(i >= MAX_STRING) { printf("String overflow!\n"); return 0; }
+    int i = STRING_START;
+    while (memory[i] != 0) {
+        if (strcmp(string, (char *) (&memory[i+1])) == 0) return i+1;
+        i += memory[i]; // follow chain
+        if((i-STRING_START) >= MAX_STRING) { printf("String overflow!\n"); return 0; }
     }
     // printf("Adding new string '%s' at pos %d\n", string, i);
 
     int len = strlen(string) + 1; // include 0 at end
-    memory[STRING_START+i] = len+1; // = skip count
+    memory[i] = len+1; // = skip count
 
     int result = i+1;
-    strcpy((char *) (&memory[STRING_START+result]), string);
-    memory[STRING_START+i+len+1] = 0; // mark end of chain
+    strcpy((char *) (&memory[result]), string);
+    memory[i+len+1] = 0; // mark end of chain
 
     return result;
 }
@@ -128,7 +128,7 @@ bool is_whitespace_char(int ch) {
 }
 int next_non_whitespace_char(FILE * infile, int until) {
     int ch = fgetc(infile);
-    while (ch != until && is_whitespace_char(ch)) ch = fgetc(infile);
+    while (ch != EOF && ch != until && is_whitespace_char(ch)) ch = fgetc(infile);
     return ch;
 }
 
@@ -368,7 +368,7 @@ void parse(FILE * infile, bool repl) {
         } else if (!is_whitespace_char(ch)) {
             // printf("Label\n");
             int i=0;
-            while (!is_whitespace_char(ch) && !is_bracket_char(ch) && ch != ';') { buffer[i++] = ch; ch = fgetc(infile); }
+            while (ch != EOF && !is_whitespace_char(ch) && !is_bracket_char(ch) && ch != ';') { buffer[i++] = ch; ch = fgetc(infile); }
             buffer[i++] = 0;
             //printf("Label is: '%s'\n", buffer);
             code_end = add_command(CMD_REF, unique_string(buffer), code, code_end);

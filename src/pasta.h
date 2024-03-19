@@ -18,7 +18,7 @@ typedef struct __attribute__((__packed__)) Variable {
 
 extern Stack argstack;
 
-#define str(v) ((char *) &memory[STRING_START+v])
+#define str(v) ((char *) &memory[v])
 
 //
 // Primitives

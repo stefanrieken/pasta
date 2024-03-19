@@ -1,7 +1,7 @@
 #include <stdint.h>
 #include <stdio.h>
 
-#include "selfless.h"
+#include "pasta.h"
 
 // Base primitive defs
 enum {
@@ -23,7 +23,9 @@ enum {
     PRIM_NOT,
     PRIM_GET_BYTE,
     PRIM_SET_BYTE,
-    PRIM_SET_ALL_BYTE
+    PRIM_SET_ALL_BYTE,
+    PRIM_LSB,
+    PRIM_MSB
 };
 
 uint16_t base_prim_group_cb(uint8_t prim) {
@@ -55,7 +57,7 @@ uint16_t base_prim_group_cb(uint8_t prim) {
             result = temp;
             break;
         case PRIM_PRINTS:
-            while(n != 1) { temp = item(&argstack, n--); printf("%s", (char *) &memory[STRING_START + temp]); }
+            while(n != 1) { temp = item(&argstack, n--); printf("%s", (char *) &memory[temp]); }
             result = temp;
             break;
         case PRIM_LS:
@@ -160,6 +162,14 @@ uint16_t base_prim_group_cb(uint8_t prim) {
             n = 1;
             result = 0;
             break;
+        case PRIM_MSB:
+            temp = item(&argstack, n--);
+            result = temp >> 8;
+            break;
+        case PRIM_LSB:
+            temp = item(&argstack, n--);
+            result = temp & 0xFF;
+            break;
         default:
             // It is very easy to come here by triggering the
             // evaluation of a random value as a function.
@@ -195,4 +205,6 @@ void register_base_prims() {
     add_variable("getb", add_primitive(group | PRIM_GET_BYTE));
     add_variable("setb", add_primitive(group | PRIM_SET_BYTE));
     add_variable("setallb", add_primitive(group | PRIM_SET_ALL_BYTE));
+    add_variable("lsb", add_primitive(group | PRIM_LSB));
+    add_variable("msb", add_primitive(group | PRIM_MSB));
 }
