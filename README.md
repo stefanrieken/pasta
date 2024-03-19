@@ -50,5 +50,6 @@ Next, typing 'make' should produce 2 local executables:
 - `tricolore` adds a screen, as well as the relevant primitives
 
 Both accept file arguments. Examples for various features are found under
-[recipes](recipes/).
+[recipes](recipes/). Add a final '-' argument to enter the REPL after running a
+file.
 
