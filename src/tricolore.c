@@ -8,6 +8,19 @@
 
 extern void * mainloop(void * arg);
 
+extern uint32_t palette[4];
+
+typedef struct Sprite {
+  uint8_t x;
+  uint8_t y;
+  uint8_t width;
+  uint8_t height;
+  uint16_t map; // location of map in memory. Must be 16 bit, otherwise granularity is way off
+  uint8_t tiles; // location of tiles. Could be 8 bit to indicate a 1k (64 tile) aligned space
+  uint8_t flags;
+} Sprite;
+
+
 static cairo_surface_t * surface = NULL;
 static cairo_pattern_t * pattern;
 GtkWidget * drawing_area;
@@ -36,6 +49,44 @@ void draw_screen_cb(GtkWidget *widget, cairo_t * cr, gpointer userdata) {
   cairo_set_antialias(cr, CAIRO_ANTIALIAS_NONE);
   cairo_scale(cr, SCALE, SCALE);
   cairo_set_source(cr, pattern);
+
+  uint8_t * pixels = cairo_image_surface_get_data(surface);
+  int rowstride = cairo_image_surface_get_stride(surface);
+
+  // Draw out sprite memory
+  // No need to clear screen when redrawing fully opaque background / character screen
+  int spritemem = 12 * 1024; // just any location
+  // 16 sprite structs of size 16 = 256 bytes
+  for (int s =0; s<16; s++) {
+    Sprite * sprite = (Sprite *) &memory[spritemem + (16 * s)];
+    int transparent = sprite->flags & 0x0F;
+
+    if (sprite->width != 0 && sprite->height != 0) {
+      int width_map = (sprite->width + 7) / 8; // Even if width and height are not byte aligned, their map data is
+
+      for (int i=0; i<sprite->height;i++) {
+        // Try to get some (partial) calculations before the next for loop, to avoid repetition
+        int map_idx_h = sprite->tiles + (i/8)*width_map;
+        for (int j=0; j<sprite->width; j++) {
+          uint8_t tile_idx = memory[sprite->map + map_idx_h + j/8];
+          // Say tile idx = 50; i = 25; j = 30
+          // Tile 50 starts at tiles + (50 / 8 tiles per line) * 16*8 bytes per tile + (50%8)*2 bytes
+          // Also need to get to the right line of this tile for the current pixel; add (i%8) * 16 bytes per line
+          // Then we need to pick out the right byte depending on the current bit written:
+          uint8_t byte_idx = (j % 8) < 4 ? 0 : 1;
+          uint8_t tile_data = memory[(20+sprite->tiles)*1024 + (tile_idx/8)*128+(i%8)*16 + ((tile_idx%8))*2 + byte_idx];
+          int pxdata = (tile_data >> ((3-(j%4))*2)) & 0b11;
+
+          uint8_t * pixel = &pixels[((sprite->y+i)*rowstride) + ((sprite->x+j)*4)];
+          // TODO palette
+          if (pxdata)
+              *((uint32_t *) pixel) = palette[pxdata]; // TODO get palette into user mem registers
+          else if (pxdata != transparent)
+              *((uint32_t *) pixel) = 0;
+        }
+      }
+    }
+  }
 
   cairo_paint(cr);
 }
@@ -72,58 +123,7 @@ void display_init(int argc, char ** argv) {
   gtk_widget_show_all(GTK_WIDGET(window));
 }
 
-extern uint32_t palette[4];
-
-typedef struct Sprite {
-  uint8_t x;
-  uint8_t y;
-  uint8_t width;
-  uint8_t height;
-  uint16_t map; // location of map in memory. Must be 16 bit, otherwise granularity is way off
-  uint8_t tiles; // location of tiles. Could be 8 bit to indicate a 1k (64 tile) aligned space
-  uint8_t flags;
-} Sprite;
-
-// Draw out sprite memory
 void draw() {
-  uint8_t * pixels = cairo_image_surface_get_data(surface);
-  int rowstride = cairo_image_surface_get_stride(surface);
-
-  // May not need to clear screen when redrawing full background / character screen
-
-  int spritemem = 12 * 1024; // just any location
-  // 16 sprite structs of size 16 = 256 bytes
-  for (int s =0; s<16; s++) {
-    Sprite * sprite = (Sprite *) &memory[spritemem + (16 * s)];
-    int transparent = sprite->flags & 0x0F;
-
-    if (sprite->width != 0 && sprite->height != 0) {
-      int width_map = (sprite->width + 7) / 8; // Even if width and height are not byte aligned, their map data is
-
-      for (int i=0; i<sprite->height;i++) {
-        // Try to get some (partial) calculations before the next for loop, to avoid repetition
-        int map_idx_h = sprite->tiles + (i/8)*width_map;
-        for (int j=0; j<sprite->width; j++) {
-          uint8_t tile_idx = memory[sprite->map + map_idx_h + j/8];
-          // Say tile idx = 50; i = 25; j = 30
-          // Tile 50 starts at tiles + (50 / 8 tiles per line) * 16*8 bytes per tile + (50%8)*2 bytes
-          // Also need to get to the right line of this tile for the current pixel; add (i%8) * 16 bytes per line
-          // Then we need to pick out the right byte depending on the current bit written:
-          uint8_t byte_idx = (j % 8) < 4 ? 0 : 1;
-          uint8_t tile_data = memory[(20+sprite->tiles)*1024 + (tile_idx/8)*128+(i%8)*16 + ((tile_idx%8))*2 + byte_idx];
-          int pxdata = (tile_data >> ((3-(j%4))*2)) & 0b11;
-
-          uint8_t * pixel = &pixels[((sprite->y+i)*rowstride) + ((sprite->x+j)*4)];
-          // TODO palette
-          if (pxdata)
-              *((uint32_t *) pixel) = palette[pxdata]; // TODO get palette into user mem registers
-          else if (pxdata != transparent)
-              *((uint32_t *) pixel) = 0;
-        }
-      }
-    }
-  }
-
   // Redraw full stcreen
   cairo_surface_mark_dirty_rectangle(surface, 0, 0, 32*8*SCALE, 32*8*SCALE);
   gtk_widget_queue_draw_area(drawing_area, 0, 0, 32*8*SCALE, 32*8*SCALE);
