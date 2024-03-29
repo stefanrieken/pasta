@@ -17,9 +17,12 @@ enum {
     PRIM_LOOP,
     PRIM_DEFINE,
     PRIM_SET,
+    PRIM_ADD,
+    PRIM_SUB,
     PRIM_ARGS,
     PRIM_REMAINDER,
     PRIM_ENUM,
+    PRIM_BITFIELD,
     PRIM_NOT,
     PRIM_GET_BYTE,
     PRIM_SET_BYTE,
@@ -32,6 +35,7 @@ uint16_t base_prim_group_cb(uint8_t prim) {
     uint16_t n = peek(&argstack);
     uint16_t temp, func, func2;
     uint16_t result = 0;
+    Variable * var;
 
     switch(prim) {
         case PRIM_HELLO:
@@ -106,12 +110,22 @@ uint16_t base_prim_group_cb(uint8_t prim) {
             break;            
         case PRIM_DEFINE:
             temp = item(&argstack, n--);
-            add_var(temp, item(&argstack, n--)); // return the value
+            add_var(temp, item(&argstack, n--));
             break;
         case PRIM_SET:
             temp = item(&argstack, n--);
-            set_var(temp, item(&argstack, n--)); // return the value
-            break;            
+            set_var(temp, item(&argstack, n--));
+            break;
+        case PRIM_ADD:
+            var = lookup_variable(item(&argstack, n--));
+            var->value += item(&argstack, n--);
+            result = var->value;
+            break;
+        case PRIM_SUB:
+            var = lookup_variable(item(&argstack, n--));
+            var->value -= item(&argstack, n--);
+            result = var->value;
+            break;
         case PRIM_ARGS:
             // As we call another function to pop our own args,
             // the callstack is a bit crowded, e.g.: 2 "y" "x" <prim_args> 2 43 42
@@ -136,6 +150,11 @@ uint16_t base_prim_group_cb(uint8_t prim) {
             break;
         case PRIM_ENUM:                
             for (int i=0; i<n-1;i++) add_var(item(&argstack, n-i), i);
+            n = 1;
+            result = 0;
+            break;
+        case PRIM_BITFIELD:
+            for (int i=0; i<n-1;i++) add_var(item(&argstack, n-i), 1 << i);
             n = 1;
             result = 0;
             break;
@@ -198,9 +217,12 @@ void register_base_prims() {
     add_variable("loop", add_primitive(group | PRIM_LOOP));
     add_variable("define", add_primitive(group | PRIM_DEFINE));
     add_variable("set", add_primitive(group | PRIM_SET)); // consider: set (at "foo") 42; to re-use set as setw (or just use '=')
+    add_variable("add", add_primitive(group | PRIM_ADD));
+    add_variable("sub", add_primitive(group | PRIM_SUB));
     add_variable("args", add_primitive(group | PRIM_ARGS));
     add_variable("remainder", add_primitive(group | PRIM_REMAINDER));
     add_variable("enum", add_primitive(group | PRIM_ENUM));
+    add_variable("bitfield", add_primitive(group | PRIM_BITFIELD));
     add_variable("!", add_primitive(group | PRIM_NOT));
     add_variable("getb", add_primitive(group | PRIM_GET_BYTE));
     add_variable("setb", add_primitive(group | PRIM_SET_BYTE));

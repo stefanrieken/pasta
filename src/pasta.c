@@ -66,17 +66,16 @@ void strings() {
     printf("\n");
 }
 
-uint16_t add_var(uint16_t name, uint16_t value) {
+Variable * add_var(uint16_t name, uint16_t value) {
     if (vars_end >= VARS_START+MAX_VARS) { printf("Variable overflow!\n"); return 0; }
     Variable * var = (Variable *) &memory[vars_end];
     var->name = name;
     var->value = value;
-    uint16_t result = vars_end;
     vars_end += sizeof(Variable);
-    return result;
+    return var;
 }
 
-uint16_t add_variable(char * name, uint16_t value) {
+Variable * add_variable(char * name, uint16_t value) {
     return add_var(unique_string(name), value);
 }
 
@@ -254,6 +253,22 @@ int add_command(unsigned char cmd, uint32_t value, unsigned char * code, int cod
     return result;
 }
 
+int parse_int(FILE * infile, int ch, int * result, int radix) {
+    // Allow letters for numbers 10 and higher, dependend on radix
+    int normalized = ch;
+    if (ch >= 'a' && ch <= 'z') normalized = '0'+10+(ch-'a');
+    else if (ch >= 'A' && ch <= 'Z') normalized = '0'+10+(ch-'A');
+    while(normalized >= '0' && normalized <= '0'+radix) {
+        *result = (*result * radix) + (normalized-'0');
+        ch = fgetc(infile);
+        normalized = ch;
+        if (ch >= 'a' && ch <= 'z') normalized = '0'+10+(ch-'a');
+        else if (ch >= 'A' && ch <= 'Z') normalized = '0'+10+(ch-'A');
+        else if (ch < '0' || ch > '9') break;
+    }
+    return ch;
+}
+
 char * escapes = "nrtfe";
 char * ctrlchars = "\n\r\t\f\e";
 
@@ -283,39 +298,38 @@ void parse(FILE * infile, bool repl) {
         }
 
         if (ch >='0' && ch <= '9') {
-            // printf("Parsing int\n");
-            int result = 0;
             int radix = 10;
             if (ch == '0') {
-               ch = fgetc(infile);
-               if(ch == 'b') { radix = 2; ch = fgetc(infile); }
-               else if(ch == 'x') { radix = 16; ch = fgetc(infile); }
-            }
-            // Allow letters for numbers 10 and higher, dependend on radix
-            int normalized = ch;
-            if (ch >= 'a' && ch <= 'z') normalized = '0'+10+(ch-'a');
-            else if (ch >= 'A' && ch <= 'Z') normalized = '0'+10+(ch-'A');
-            while(normalized >= '0' && normalized <= '0'+radix) {
-                result = (result * radix) + (normalized-'0');
                 ch = fgetc(infile);
-                normalized = ch;
-               if (ch >= 'a' && ch <= 'z') normalized = '0'+10+(ch-'a');
-               else if (ch >= 'A' && ch <= 'Z') normalized = '0'+10+(ch-'A');
+                if(ch == 'b') { radix = 2; ch = fgetc(infile); }
+                else if(ch == 'x') { radix = 16; ch = fgetc(infile); }
             }
+            int result = 0;
+            ch = parse_int(infile, ch, &result, radix);
             code_end = add_command(CMD_PUSH, result, code, code_end);
             count(&countstack, 1);
+//            continue;
             if (!is_whitespace_char(ch) || (countstack.length == 1 && ch == '\n')) continue; // so that superfluous 'ch' is processed in next round
         } else if (ch=='\"') {
             int i = 0;
-            do {
+            ch = fgetc(infile);
+            while (ch != '\"') {
+                if (ch == '\\') {
+                    ch = fgetc(infile);
+                    if (ch == 'x') {
+                        int result = 0;
+                        ch = parse_int(infile, fgetc(infile), &result, 16);
+                        buffer[i++] = result;
+                        continue;
+                    }
+
+	                for (int j=0; j<strlen(escapes); j++) {
+                        if (escapes[j] == ch) { ch = ctrlchars[j]; break; }
+                    }
+                }
+                buffer[i++] = ch;
                 ch = fgetc(infile);
-	        if (ch == '\\') {
-                  ch = fgetc(infile);
-	          for (int i=0; i<strlen(escapes); i++)
-		    if (escapes[i] == ch) { ch = ctrlchars[i]; break; }
-	        }
-                if (ch != '\"') buffer[i++] = ch;
-            } while (ch != '\"');
+            }
             buffer[i++] = 0;
             code_end = add_command(CMD_PUSH, unique_string(buffer), code, code_end);
             count(&countstack, 1);

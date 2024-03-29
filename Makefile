@@ -13,4 +13,4 @@ tricolore: $(OBJS) src/bitmap.o src/tricolore.o
 	$(CC) $(CFLAGS) $^ -o $@ `pkg-config --libs cairo gdk-3.0 gtk+-3.0`
 
 clean:
-	rm -rf *.o selfless tricolore
+	rm -rf src/*.o pasta tricolore

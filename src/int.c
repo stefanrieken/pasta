@@ -15,54 +15,71 @@ enum {
     PRIM_GT,
     PRIM_GTE,
     PRIM_EQ,
+    PRIM_ANDB,
     PRIM_AND,
+    PRIM_ORB,
     PRIM_OR,
-    PRIM_XOR
+    PRIM_XOR,
+    PRIM_LEFT_SHIFT,
+    PRIM_RIGHT_SHIFT
 };
 
 uint16_t int_prim_group_cb(uint8_t prim) {
     uint16_t n = peek(&argstack);
-    uint16_t val = item(&argstack, n--);
-    uint16_t result = 0;
+    uint16_t result = item(&argstack, n--);
         switch(prim) {
             case PRIM_PLUS:
-                result = val + item(&argstack, n--);
+                while (n > 1) result += item(&argstack, n--);
                 break;
             case PRIM_MINUS:
-                result = val - item(&argstack, n--);
+                while (n > 1) result -= item(&argstack, n--);
                 break;
             case PRIM_TIMES:
-                result = val * item(&argstack, n--);
+                while (n > 1) result *= item(&argstack, n--);
                 break;
             case PRIM_DIV:
-                result = val / item(&argstack, n--);
+                result = result / item(&argstack, n--);
                 break;
             case PRIM_REST:
-                result = val % item(&argstack, n--);
+                result = result % item(&argstack, n--);
                 break;
             case PRIM_LT:
-                result = val < item(&argstack, n--);
+                result = result < item(&argstack, n--);
                 break;
             case PRIM_LTE:
-                result = val <= item(&argstack, n--);
+                result = result <= item(&argstack, n--);
                 break;
             case PRIM_GT:
-                result = val > item(&argstack, n--);
+                result = result > item(&argstack, n--);
                 break;
             case PRIM_GTE:
-                result = val >= item(&argstack, n--);
+                result = result >= item(&argstack, n--);
                 break;
             case PRIM_EQ:
-                result = val == item(&argstack, n--);
+                result = result == item(&argstack, n--);
+                break;
+            case PRIM_ANDB:
+                while (n > 1) result &= item(&argstack, n--);
                 break;
             case PRIM_AND:
-                result = val & item(&argstack, n--);
+                // Have to overcome C's laziness; eval item at argstack first
+                while (n > 1) result = item(&argstack, n--) && result;
+                break;
+            case PRIM_ORB:
+                while (n > 1) result |= item(&argstack, n--);
                 break;
             case PRIM_OR:
-                result = val | item(&argstack, n--);
+                // Have to overcome C's laziness; eval item at argstack first
+                while (n > 1) result = item(&argstack, n--) || result;
                 break;
             case PRIM_XOR:
-                result = val ^ item(&argstack, n--);
+                while (n > 1) result ^= item(&argstack, n--);
+                break;
+            case PRIM_LEFT_SHIFT:
+                result = result << item(&argstack, n--);
+                break;
+            case PRIM_RIGHT_SHIFT:
+                result = result >> item(&argstack, n--);
                 break;
             default:
                 printf("Invalid primitive reference: %d\n", prim);
@@ -70,7 +87,7 @@ uint16_t int_prim_group_cb(uint8_t prim) {
                 break;
         }
 
-        if (n != 1) printf("WARN: %d leftover args\n", n);
+        if (n != 1) printf("WARN: %d leftover args\n", n-1);
 
         return result;
 }
@@ -88,7 +105,11 @@ void register_int_prims() {
     add_variable(">", add_primitive(group | PRIM_GT));
     add_variable(">=", add_primitive(group | PRIM_GTE));
     add_variable("=", add_primitive(group | PRIM_EQ));
-    add_variable("&", add_primitive(group | PRIM_AND));
-    add_variable("|", add_primitive(group | PRIM_OR));
+    add_variable("&", add_primitive(group | PRIM_ANDB));
+    add_variable("&&", add_primitive(group | PRIM_AND));
+    add_variable("|", add_primitive(group | PRIM_ORB));
+    add_variable("||", add_primitive(group | PRIM_OR));
     add_variable("^", add_primitive(group | PRIM_XOR));
+    add_variable("<<", add_primitive(group | PRIM_LEFT_SHIFT));
+    add_variable(">>", add_primitive(group | PRIM_RIGHT_SHIFT));
 }

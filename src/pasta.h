@@ -3,18 +3,19 @@
 
 void run_func(uint16_t func);
 
-uint16_t add_variable(char * name, uint16_t value);
-uint16_t add_var(uint16_t name, uint16_t value);
-uint16_t set_var(uint16_t name, uint16_t value);
-
-void print_asm(unsigned char * code, int code_end);
-void ls();
-void strings();
-
 typedef struct __attribute__((__packed__)) Variable {
     uint16_t name;
     uint16_t value; // TODO do we assume all types' values fit in 16 bits?
 } Variable;
+
+Variable * add_variable(char * name, uint16_t value);
+Variable * add_var(uint16_t name, uint16_t value);
+uint16_t set_var(uint16_t name, uint16_t value);
+Variable * lookup_variable(uint16_t name);
+
+void print_asm(unsigned char * code, int code_end);
+void ls();
+void strings();
 
 extern Stack argstack;
 
@@ -37,7 +38,7 @@ extern uint8_t * memory;
 
 #define CODE_START (1 * 1024)
 
-#define STRING_START (4 * 1024)
+#define STRING_START (5 * 1024)
 #define MAX_CODE (STRING_START - CODE_START)
 extern int code_end;
 extern int main_start;
