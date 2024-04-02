@@ -1,0 +1,34 @@
+# define the sprite struct
+enum "xpos" "ypos" "width" "height" "map0" "map1" "tileset" "flags" "colors0" "colors1"
+
+# returns sprite struct n
+define "sprite" {
+    args "n";
+    + (* 12 1024) (* n 16)
+}
+
+# Load base ascii / spritesets into memory (may be builtin)
+#load_bitmap "assets/ascii1.bmp" (tileset 0)
+#load_bitmap "assets/ascii2.bmp" (tileset 1)
+
+# Define text screen / background sprite
+define "screen_spr" (sprite 0)
+define "screen" (* 30 1024) # Location of screen data
+setallb screen_spr 0 0 32 32 (lsb screen) (msb screen) 0 0x00 0x10 0x30 # set transparent=none; default color scheme
+
+# Place palette (and display registers?) after 16 sprite regs (for somewhere to go)
+define "palette" (sprite 16)
+
+define "colour" {
+    args "n" "r" "g" "b";
+    setallb (+ palette (* n 4)) b g r; # Carrying over quirks from bitmap format
+}
+
+# 16 color palette
+# The first 4 colors override those loaded in with the bitmaps
+colour 0 0x00 0x00 0x00 # Black
+colour 1 0xff 0xff 0xff # White
+colour 2 0x88 0x88 0x88 # Grey
+#colour 3 0xe4 0xba 0x32 # Yellow
+colour 3 0xca 0xaa 0x32 # Yellow
+colour 4 0xff 0x99 0xcc # Pink

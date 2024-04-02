@@ -1,20 +1,4 @@
-# define the sprite struct
-enum "xpos" "ypos" "width" "height" "map0" "map1" "tileset" "flags"
-
-# returns sprite struct n
-define "sprite" {
-    args "n";
-    + (* 12 1024) (* n 16)
-}
-
-# Load base ascii / spritesets into memory (may be builtin)
-#load_bitmap "assets/ascii1.bmp" (tileset 0)
-#load_bitmap "assets/ascii2.bmp" (tileset 1)
-
-# Demo: write something on screen
-define "screen_spr" (sprite 0)
-define "screen" (* 30 1024)
-setallb screen_spr 0 0 32 32 (lsb screen) (msb screen) 0 0x04 # set transparent to greater than 3 =none
+# Assumes lib.trico is loaded
 
 define "cursor" (write screen "\x7FTricolore\n\n")
 add "cursor" 1;
@@ -32,7 +16,7 @@ loop {
 # Add a sprite
 define "sprite1" (sprite 1)
 define "tile1" (* 31 1024)
-setallb sprite1 112 0 1 1 (lsb tile1) (msb tile1) 0 0 # set zero color to be transparent
+setallb sprite1 112 0 1 1 (lsb tile1) (msb tile1) 0 0x10 0x10 0x30 # set first color (= index 0) to be transparent + set color indices
 setb tile1 21
 
 draw;

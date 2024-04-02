@@ -92,7 +92,7 @@ uint16_t set_var(uint16_t name, uint16_t value) {
 }
 
 Variable * lookup_variable(uint16_t name) {
-    for (int i=VARS_START;i<vars_end;i+=sizeof(Variable)) {
+    for (int i=vars_end-sizeof(Variable);i>=VARS_START;i-=sizeof(Variable)) {
         Variable * var = (Variable *) &memory[i];
         if(var->name == name) return var;
     }

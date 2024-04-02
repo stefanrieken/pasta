@@ -1,5 +1,6 @@
 #include <string.h>
 #include <pthread.h>
+#include <stdio.h>
 
 #include <gtk/gtk.h>
 
@@ -15,6 +16,9 @@ static cairo_surface_t * surface = NULL;
 static cairo_pattern_t * pattern;
 GtkWidget * drawing_area;
 #define SCALE 2
+
+// palette register is placed after 16 sprites
+#define PALETTE_MEM 12 * 1024 + 16*16
 
 void delete_cb(GtkWidget *widget, GdkEventType *event, gpointer userdata) {
   // destroy any global drawing state here,
@@ -138,8 +142,6 @@ void display_init(int argc, char ** argv) {
   gtk_widget_show_all(GTK_WIDGET(window));
 }
 
-extern uint32_t palette[4];
-
 typedef struct Sprite {
   uint8_t x;
   uint8_t y;
@@ -148,6 +150,7 @@ typedef struct Sprite {
   uint16_t map; // location of map in memory. Must be 16 bit, otherwise granularity is way off
   uint8_t tiles; // location of tiles. Could be 8 bit to indicate a 1k (64 tile) aligned space
   uint8_t flags;
+  uint16_t colors; // 4x index into 4-bit color palette
 } Sprite;
 
 // Draw out sprite memory
@@ -158,6 +161,8 @@ void draw() {
   // May not need to clear screen when redrawing full background / character screen
 
   int spritemem = 12 * 1024; // just any location
+  uint32_t * palette = (uint32_t *) &memory[PALETTE_MEM];
+
   // 16 sprite structs of size 16 = 256 bytes
   for (int s =0; s<16; s++) {
     Sprite * sprite = (Sprite *) &memory[spritemem + (16 * s)];
@@ -183,10 +188,10 @@ void draw() {
           int pixel_idx = (((sprite->y+i)%256)*rowstride) + (((sprite->x+j)%256)*4); // The %256 rotates pixels on a 32x8 wide display
           uint8_t * pixel = &pixels[pixel_idx];
           // TODO palette
-          if (pxdata)
-              *((uint32_t *) pixel) = palette[pxdata]; // TODO get palette into user mem registers
-          else if (pxdata != transparent)
-              *((uint32_t *) pixel) = 0;
+          if (!(transparent & (1 << pxdata))) {
+              int color = (sprite->colors >> (pxdata*4)) & 0b1111;
+              *((uint32_t *) pixel) = palette[color]; // TODO get palette into user mem registers
+          }
         }
       }
     }
@@ -261,10 +266,17 @@ int main (int argc, char ** argv) {
     register_display_prims();
 
     // Fill ascii
-    quickread_2bitmap("assets/ascii1.bmp", (char *) &memory[0x5000]);
-    quickread_2bitmap("assets/ascii2.bmp", (char *) &memory[0x5400]);
+    quickread_2bitmap("assets/ascii1.bmp", (char *) &memory[0x5000], (uint32_t *) &memory[PALETTE_MEM]);
+    quickread_2bitmap("assets/ascii2.bmp", (char *) &memory[0x5400], (uint32_t *) &memory[PALETTE_MEM]);
 
     display_init(argc, argv);
+
+    // Load Tricolore lib
+    FILE * infile;
+    if ((infile = fopen("recipes/lib.trico", "r"))) {
+        parse(infile, true);
+        fclose(infile);
+    }
 
     pthread_t worker_thread;
     pthread_create(&worker_thread, NULL, mainloop, &argv[1]);

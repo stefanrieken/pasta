@@ -7,7 +7,7 @@
 #include <cairo.h>
 
 uint8_t bitmapheader[54];
-uint32_t palette[4];
+//uint32_t palette[4];
 
 // Read big endian data into little endian int
 uint32_t read_data(FILE * file) {
@@ -34,7 +34,7 @@ static void write_data(FILE * file, uint32_t data) {
  * Note: not all programs can read (or write) 2-bit color
  * bitmaps (they expect 1, 4 or 8).
  */
-bool quickread_2bitmap(const char * filename, char * buffer) {
+bool quickread_2bitmap(const char * filename, char * buffer, uint32_t * palette) {
     FILE * file = fopen(filename, "rb");
     if (file == NULL) {
         printf("file not found\n");
@@ -60,7 +60,7 @@ bool quickread_2bitmap(const char * filename, char * buffer) {
     return true;
 }
 
-void quickwrite_2bitmap(const char * filename, char * buffer) {
+void quickwrite_2bitmap(const char * filename, char * buffer, uint32_t * palette) {
     FILE * file = fopen(filename, "wb");
     
     for (int i=0; i<54; i++) {

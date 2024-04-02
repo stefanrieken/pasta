@@ -1,4 +1,7 @@
 #include <stdint.h>
+#include <stdbool.h>
+#include <stdio.h>
+
 #include "stack.h"
 
 void run_func(uint16_t func);
@@ -12,6 +15,8 @@ Variable * add_variable(char * name, uint16_t value);
 Variable * add_var(uint16_t name, uint16_t value);
 uint16_t set_var(uint16_t name, uint16_t value);
 Variable * lookup_variable(uint16_t name);
+
+void parse(FILE * infile, bool repl);
 
 void print_asm(unsigned char * code, int code_end);
 void ls();
