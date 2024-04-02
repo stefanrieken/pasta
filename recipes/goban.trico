@@ -1,0 +1,78 @@
+
+# Give the goban its own sprite; mainly so that (bg) color scheme can differ from that of text screen
+define "goban_spr" (sprite 1);
+define "goban" (* 31 1024)
+setallb goban_spr 8 8 19 19 (lsb goban) (msb goban) 0 0x00 0x23 0x20
+# for an outline (print) style:
+#setallb goban_spr 8 8 19 19 (lsb goban) (msb goban) 0 0x00 0x01 0x02
+
+# Give the stones their own sprite
+define "stones_spr" (sprite 2);
+define "stones" (+ goban (* 19 19))
+setallb stones_spr 8 8 19 19 (lsb stones) (msb stones) 0 0x01 0x02 0x11
+# for an outline (print) style:
+#setallb stones_spr 8 8 19 19 (lsb stones) (msb stones) 0 0x01 0x02 0x01
+
+# This function maps coords so that they start at 1,
+# like a player would use them
+define "point" {
+    args "x" "y";
+    + (* (- y 1) 19) (- x 1)
+}
+
+define "x" 1
+define "y" 1
+
+# Corners
+setb goban (point 1 1) 0x08;
+setb goban (point 19 1) 0x0A;
+setb goban (point 1 19) 0x18;
+setb goban (point 19 19) 0x1A;
+
+loop {
+    add "x" 1;
+    setb goban(point x  1) 0x09; # Top edge
+    setb goban (point x 19) 0x19; # Bottom edge
+    setb goban (point 1 x) 0x10; # Left edge (re-using 'x' for 'y')
+    setb goban (point 19 x) 0x12; # Right edge
+    < x 18
+}
+
+
+set "x" 2;
+set "y" 2;
+
+loop {
+    loop {
+        setb goban (point x y) 0x11;
+        add "x" 1;
+        < x 19
+    };
+    set "x" 2;
+    add "y" 1;
+    < y 19
+}
+
+# Star points
+set "x" 4;
+set "y" 4;
+loop {
+    loop {
+        setb goban (point x y) 0x1B;
+        add "x" 6;
+        < x 17
+    };
+    set "x" 4;
+    add "y" 6;
+    < y 17
+}
+
+# Play a few stones
+setb stones (point 16 4) 0x13
+setb stones (point 4 16) 0x0B
+setb stones (point 3 16) 0x13
+
+define "cursor" (+ screen (* 21 32))
+set "cursor" (write cursor "Well this is fun.\n")
+
+draw
