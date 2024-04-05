@@ -167,23 +167,24 @@ void draw() {
   for (int s =0; s<16; s++) {
     Sprite * sprite = (Sprite *) &memory[spritemem + (16 * s)];
     int transparent = sprite->flags & 0x0F;
-
+    int scalex = ((sprite->flags >> 4) & 0b11)+1; // Can scale 2,3,4 times; maybe rather 2,4,8?
+    int scaley = ((sprite->flags >> 6) & 0b11)+1;
     if (sprite->width != 0 && sprite->height != 0) {
       int width_map = sprite->width; //(sprite->width + 7) / 8; // Even if width and height are not byte aligned, their map data is
 
-      for (int i=0; i<sprite->height*8;i++) {
+      for (int i=0; i<sprite->height*8*scaley;i++) {
         // Try to get some (partial) calculations before the next for loop, to avoid repetition
-        int map_idx_h = sprite->tiles + (i/8)*width_map;
-        for (int j=0; j<sprite->width*8; j++) {
+        int map_idx_h = sprite->tiles + (i/(8*scaley))*width_map;
+        for (int j=0; j<sprite->width*8*scalex; j++) {
           //if(sprite->x+j > 255) { continue; }
-          uint8_t tile_idx = memory[sprite->map + map_idx_h + j/8];
+          uint8_t tile_idx = memory[sprite->map + map_idx_h + j/(8*scalex)];
           // Say tile idx = 50; i = 25; j = 30
           // Tile 50 starts at tiles + (50 / 8 tiles per line) * 16*8 bytes per tile + (50%8)*2 bytes
           // Also need to get to the right line of this tile for the current pixel; add (i%8) * 16 bytes per line
           // Then we need to pick out the right byte depending on the current bit written:
-          uint8_t byte_idx = (j % 8) < 4 ? 0 : 1;
-          uint8_t tile_data = memory[(20+sprite->tiles)*1024 + (tile_idx/8)*128+(i%8)*16 + ((tile_idx%8))*2 + byte_idx];
-          int pxdata = (tile_data >> ((3-(j%4))*2)) & 0b11;
+          uint8_t byte_idx = ((j/scalex) % 8) < 4 ? 0 : 1;
+          uint8_t tile_data = memory[(20+sprite->tiles)*1024 + (tile_idx/8)*128+((i/scaley)%8)*16 + ((tile_idx%8))*2 + byte_idx];
+          int pxdata = (tile_data >> ((3-((j/scalex)%4))*2)) & 0b11;
 
           int pixel_idx = (((sprite->y+i)%256)*rowstride) + (((sprite->x+j)%256)*4); // The %256 rotates pixels on a 32x8 wide display
           uint8_t * pixel = &pixels[pixel_idx];

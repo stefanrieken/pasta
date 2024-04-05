@@ -1,6 +1,11 @@
 # define the sprite struct
 enum "xpos" "ypos" "width" "height" "map0" "map1" "tileset" "flags" "colors0" "colors1"
 
+# Current flags:
+# - Scale y (bits 7-6)
+# - Scale x (bits 5-4)
+# - Transparency (bits 3-0, on / off for each color index)
+
 # returns sprite struct n
 define "sprite" {
     args "n";
@@ -26,9 +31,8 @@ define "colour" {
 
 # 16 color palette
 # The first 4 colors override those loaded in with the bitmaps
-colour 0 0x00 0x00 0x00 # Black
-colour 1 0xff 0xff 0xff # White
-colour 2 0x88 0x88 0x88 # Grey
-#colour 3 0xe4 0xba 0x32 # Yellow
-colour 3 0xca 0xaa 0x32 # Yellow
+colour 0 0x19 0x0a 0x24 # Black
+colour 1 0xff 0xff 0xfa # White
+colour 2 0x9b 0xae 0xb5 # Grey
+colour 3 0xff 0xc8 0x52 # Yellow
 colour 4 0xff 0x99 0xcc # Pink

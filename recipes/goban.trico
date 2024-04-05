@@ -1,13 +1,13 @@
 
 # Give the goban its own sprite; mainly so that (bg) color scheme can differ from that of text screen
-define "goban_spr" (sprite 1);
+define "goban_spr" (sprite 1)
 define "goban" (* 31 1024)
 setallb goban_spr 8 8 19 19 (lsb goban) (msb goban) 0 0x00 0x23 0x20
 # for an outline (print) style:
 #setallb goban_spr 8 8 19 19 (lsb goban) (msb goban) 0 0x00 0x01 0x02
 
 # Give the stones their own sprite
-define "stones_spr" (sprite 2);
+define "stones_spr" (sprite 2)
 define "stones" (+ goban (* 19 19))
 setallb stones_spr 8 8 19 19 (lsb stones) (msb stones) 0 0x01 0x02 0x11
 # for an outline (print) style:
