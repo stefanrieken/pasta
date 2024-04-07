@@ -12,10 +12,22 @@ loop {
     <= i 10
 }
 
-# This acts like a 'while' loop:
+# This takes in a second block, to act like a 'while' loop:
 
 set "i" 1;
 loop {<= i 10} {
     print i;
     set "i" (+ i 1)
 }
+
+# This does the same, without requiring the double block syntax:
+
+set "i" 1;
+loop {
+    if (<= i 10) {
+        print i;
+        set "i" (+ i 1);
+        return true
+    }
+}
+
