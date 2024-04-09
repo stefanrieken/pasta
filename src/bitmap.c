@@ -60,7 +60,7 @@ bool quickread_2bitmap(const char * filename, char * buffer, uint32_t * palette)
     return true;
 }
 
-void quickwrite_2bitmap(const char * filename, char * buffer, uint32_t * palette) {
+void quickwrite_2bitmap(const char * filename, uint8_t * buffer, uint32_t * palette) {
     FILE * file = fopen(filename, "wb");
     
     for (int i=0; i<54; i++) {

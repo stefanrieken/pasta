@@ -1,0 +1,19 @@
+define "cursor" (write screen "\x7FTricolore\n\n")
+
+set "cursor" (write cursor "Cat chasing mouse!\x14\n")
+
+define "sprite1" (sprite 1)
+define "tile1" (* 31 1024)
+
+setallb sprite1 112 0 1 1 (lsb tile1) (msb tile1) 0 0x01 0x10 0x30 # set scale = 2x on both axes + set first color to be transparent
+setb tile1 21
+
+loop {
+    if (! (&& (= pointer_x (getb sprite1 xpos)) (= pointer_y (getb sprite1 ypos)))) {
+        setb sprite1 xpos pointer_x;
+        setb sprite1 ypos pointer_y;
+        draw;
+    };
+    catchup;
+    return true
+}

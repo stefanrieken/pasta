@@ -3,15 +3,20 @@
 define "goban_spr" (sprite 1)
 define "goban" (* 31 1024)
 setallb goban_spr 8 8 19 19 (lsb goban) (msb goban) 0 0x00 0x23 0x20
-# for an outline (print) style:
-#setallb goban_spr 8 8 19 19 (lsb goban) (msb goban) 0 0x00 0x01 0x02
 
 # Give the stones their own sprite
 define "stones_spr" (sprite 2)
 define "stones" (+ goban (* 19 19))
 setallb stones_spr 8 8 19 19 (lsb stones) (msb stones) 0 0x01 0x02 0x11
+
+define "move_spr" (sprite 3)
+define "move_tile" (+ liberties (* 19 19))
+setallb move_spr 112 0 1 1 (lsb move_tile) (msb move_tile) 0 0x01 0x02 0x11
+setb move_tile 0x13
+
 # for an outline (print) style:
-#setallb stones_spr 8 8 19 19 (lsb stones) (msb stones) 0 0x01 0x02 0x01
+setb  goban_spr colors0 0x01; setb goban_spr colors1 0x02
+setb stones_spr colors1 0x01; setb  move_spr colors1 0x01
 
 # This function maps coords so that they start at 1,
 # like a player would use them
@@ -68,11 +73,98 @@ loop {
 }
 
 # Play a few stones
-setb stones (point 16 4) 0x13
-setb stones (point 4 16) 0x0B
-setb stones (point 3 16) 0x13
+#setb stones (point 16 4) 0x13
+#setb stones (point 4 16) 0x0B
+#setb stones (point 3 16) 0x13
 
 define "cursor" (+ screen (* 21 32))
 set "cursor" (write cursor "Well this is fun.\n")
 
 draw
+
+# These are simple liberties, i.e.: one free point can count up to 4x double
+define "liberties" (+ stones (* 19 19))
+
+
+# propagate new value over fully connected shape
+define "floodfill" {
+    args "color" "value" "x" "y";
+    if (&& (>= x 1) (>= y 1) (<= x 19) (<= y 19) (= (getb stones (point x y)) color) (! (= (getb liberties (point x y)) value)) ) {
+        setb liberties (point x y) value;
+        if (= value 0) {
+            setb stones (point x y) 0; # capture
+            # increase liberties of surrounding groups
+            define "opposite" (if (= color 0x13) { return 0x0b } { return 0x13 });
+            floodfill opposite (+ (getb liberties (point x (- y 1))) 1) x (- y 1);
+            floodfill opposite (+ (getb liberties (point (- x 1) y)) 1) (- x 1) y;
+            floodfill opposite (+ (getb liberties (point x (+ y 1))) 1) x (+ y 1);
+            floodfill opposite (+ (getb liberties (point (+ x 1) y)) 1) (+ x 1) y;
+        };
+        floodfill color value x (- y 1);
+        floodfill color value (- x 1) y;
+        floodfill color value x (+ y 1);
+        floodfill color value (+ x 1) y;
+    }
+}
+
+# Determine added liberty count of connected field
+define "added_value" {
+    args "color" "x" "y";
+    if (&& (>= x 1) (>= y 1) (<= x 19) (<= y 19)) {
+        if (= color (getb stones (point x y))) {
+            - (getb liberties (point x y)) 1
+        } {
+            if (= 0 (getb stones (point x y))) {
+                return 1
+            }
+        }
+    }
+    # else branches return 0
+}
+
+define "play" {
+    args "color" "x" "y";
+
+    # Subtract a liberty from connected opposite stones
+    define "opposite" (if (= color 0x13) { return 0x0b } { return 0x13 });
+    floodfill opposite (- (getb liberties (point x (- y 1))) 1) x (- y 1);
+    floodfill opposite (- (getb liberties (point (- x 1) y)) 1) (- x 1) y;
+    floodfill opposite (- (getb liberties (point x (+ y 1))) 1) x (+ y 1);
+    floodfill opposite (- (getb liberties (point (+ x 1) y)) 1) (+ x 1) y;
+
+    define "newval" 0;
+    add "newval" (added_value color x (- y 1));
+    add "newval" (added_value color (- x 1) y);
+    add "newval" (added_value color x (+ y 1));
+    add "newval" (added_value color (+ x 1) y);
+
+    # prints "Liberties: ";
+    # print newval;
+    setb stones (point x y) color;
+    setb move_tile opposite;
+    floodfill color 0xFF x y; # First fill with unique value to give flood fill a stop condition
+    floodfill color newval x y; # Then fill with actual value
+}
+
+loop {
+    if (! (&& (= (/ pointer_x 8) x) (= (/ pointer_y 8) y))) {
+        set "x" (/ pointer_x 8);
+        set "y" (/ pointer_y 8);
+        setallb move_spr (* x 8) (* y 8) 8 8; # show cursor at nearest grid pos, and make visible
+
+        draw;
+    };
+    if (return click) {
+        set "click" 0;
+        if (&& (>= x 1) (>= x 1) (<= x 19) (<= y 19)) {
+            #setb stones (point x y) (getb move_tile);
+            play (getb move_tile) x y;
+            setb move_spr width 0;
+            setb move_spr height 0; # make opposite invisible until cursor has moved
+            draw;
+        }
+    };
+    catchup;
+    return true
+}
+

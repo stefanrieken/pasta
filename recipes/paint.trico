@@ -1,0 +1,78 @@
+define "cursor" screen;
+
+define "button" {
+    args "text";
+    set "cursor" (write cursor "\x08\x0c\x0c\x0c\x0c\x0c\x0c");
+    setb cursor 0x0a; add "cursor" 1; # can't write graphical char under 'newline' value
+    set "cursor" (write cursor "\n\x0d" text "\x0d\n");
+    set "cursor" (write cursor "\x18\x0c\x0c\x0c\x0c\x0c\x0c\x1a\n")
+}
+
+button "save  "
+button "color "
+button "page 0"
+
+define "sheet_spr" (sprite 1)
+define "sheet" (* 31 1024)
+setallb sheet_spr 64 0 8 8 (lsb sheet) (msb sheet) 0 0xA0 0x10 0x32 # set transparent=none; default color scheme
+
+define "color_spr" (sprite 2)
+define "colorref" (+ sheet 256)
+setallb color_spr 48 32 1 1 (lsb colorref) (msb colorref) 0 0x00 0x10 0x32
+#write colorref "x"
+
+define "page" {
+    args "n";
+    define "i" 0;
+    loop {
+        setb sheet i (+ n i);
+        add "i" 1;
+        <= i 64
+    };
+
+    draw
+}
+
+page 0
+
+define "tilemem" 0x5000
+define "color" 0b00
+
+loop {
+    if (return click) {
+        if (&& (>= pointer_x 64) (< pointer_y 192)) {
+            define "x" (/ (- pointer_x 64) 3); # offset on screen
+            define "y" (/ pointer_y 3); # and scale
+
+            define "byte" (+ (* y 16) (/ x 4));
+            define "bits" (* (% x 4) 2);
+            define "mask" (<< 0b11 (- 6 bits));
+            define "value"  (<< color (- 6 bits));
+
+            #prints "painting"; print byte;
+            setb tilemem (* (getb sheet) 16) byte (| (& (getb tilemem (* (getb sheet) 16) byte) (~ mask)) value);
+            draw;
+        };
+        if (&& (< pointer_x 64) (>= pointer_y 0) (< pointer_y 24)) {
+            set "click" 0;
+            save_sheet (+ tilemem (* (getb sheet) 16)) palette;
+            setallb (+ screen 0x25) 0x64 0x21; #say 'saved'
+            draw;
+            setallb (+ screen 0x25) 0 0 # clear for next repaint
+        };
+        if (&& (< pointer_x 64) (>= pointer_y 24) (< pointer_y 48)) {
+            set "click" 0; # stop repeats
+            set "color" (& (+ color 1) 0b11);
+            setb color_spr colors0 color;
+            draw
+        };
+        if (&& (< pointer_x 64) (>= pointer_y 48) (< pointer_y 72)) {
+            set "click" 0; # stop repeats
+            page (+ (getb sheet) 64);
+            setb (+ screen 0x0E6) (+ 0x30 (/ (getb sheet) 64));
+            draw
+        }
+    };
+    catchup;
+    return true
+}

@@ -24,6 +24,7 @@ enum {
     PRIM_ENUM,
     PRIM_BITFIELD,
     PRIM_NOT,
+    PRIM_NOTB,
     PRIM_GET_BYTE,
     PRIM_SET_BYTE,
     PRIM_SET_ALL_BYTE,
@@ -162,14 +163,17 @@ uint16_t base_prim_group_cb(uint8_t prim) {
             result = item(&argstack, n--);
             result = result ? 0 : 1;
             break;
+        case PRIM_NOTB:
+            result = ~item(&argstack, n--); // TODO consider limiting to 8 bits
+            break;
         case PRIM_GET_BYTE:
             temp = item(&argstack, n--);
-            if (n > 1) temp += item(&argstack, n--); // Allow struct indexing: get mystruct myenum
+            while (n > 1) temp += item(&argstack, n--); // Allow struct indexing: get mystruct myenum
             result = memory[temp];
             break;
         case PRIM_SET_BYTE:
             temp = item(&argstack, n--);
-            if (n > 2) temp += item(&argstack, n--); // Allow struct indexing: get mystruct myenum
+            while (n > 2) temp += item(&argstack, n--); // Allow struct indexing: get mystruct myenum
             result = item(&argstack, n--);
             memory[temp] = result;
             break;
@@ -224,6 +228,7 @@ void register_base_prims() {
     add_variable("enum", add_primitive(group | PRIM_ENUM));
     add_variable("bitfield", add_primitive(group | PRIM_BITFIELD));
     add_variable("!", add_primitive(group | PRIM_NOT));
+    add_variable("~", add_primitive(group | PRIM_NOTB));
     add_variable("getb", add_primitive(group | PRIM_GET_BYTE));
     add_variable("setb", add_primitive(group | PRIM_SET_BYTE));
     add_variable("setallb", add_primitive(group | PRIM_SET_ALL_BYTE));

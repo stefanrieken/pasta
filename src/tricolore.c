@@ -48,6 +48,9 @@ void draw_screen_cb(GtkWidget *widget, cairo_t * cr, gpointer userdata) {
 }
 
 Variable * direction;
+Variable * pointer_x;
+Variable * pointer_y;
+Variable * click;
 
 struct timespec last_time;
 struct timespec this_time;
@@ -116,6 +119,20 @@ void key_release_cb(GtkWidget *widget, GdkEventKey * event, gpointer userdata) {
     }
 }
 
+void motion_cb(GtkWidget *widget, GdkEventMotion * event, gpointer userdata) {
+    pointer_x->value = event->x / SCALE;
+    pointer_y->value = event->y / SCALE;
+}
+
+void button_cb(GtkWidget *widget, GdkEventButton * event, gpointer userdata) {
+    // Presently only detecting left button
+    if (event->type == GDK_BUTTON_PRESS) {
+        click->value++; // User must clear
+    } else if (event->type == GDK_BUTTON_RELEASE) {
+        click->value = 0;
+    }
+}
+
 void display_init(int argc, char ** argv) {
 
   gtk_init (&argc, &argv);
@@ -125,16 +142,20 @@ void display_init(int argc, char ** argv) {
   gtk_window_set_default_size(window, SCREEN_WIDTH*8*SCALE, SCREEN_HEIGHT*8*SCALE);
   gtk_window_set_resizable(window, FALSE);
 
-  gtk_widget_add_events(GTK_WIDGET(window), GDK_KEY_PRESS_MASK | GDK_KEY_RELEASE_MASK);
-
-  g_signal_connect(G_OBJECT(window), "delete-event", G_CALLBACK(delete_cb), NULL);
-  g_signal_connect(G_OBJECT(window), "delete-event", G_CALLBACK(delete_cb), NULL);
-  g_signal_connect(G_OBJECT(window), "key-press-event", G_CALLBACK (key_press_cb), NULL);
-  g_signal_connect(G_OBJECT(window), "key-release-event", G_CALLBACK (key_release_cb), NULL);
-
   drawing_area = gtk_drawing_area_new();
   gtk_widget_set_size_request(drawing_area, SCREEN_WIDTH*8*SCALE, SCREEN_HEIGHT*8*SCALE);
   gtk_container_add(GTK_CONTAINER(window), drawing_area);
+
+  gtk_widget_add_events(GTK_WIDGET(window), GDK_KEY_PRESS_MASK | GDK_KEY_RELEASE_MASK);
+  gtk_widget_add_events(GTK_WIDGET(drawing_area), GDK_POINTER_MOTION_MASK | GDK_BUTTON_PRESS_MASK | GDK_BUTTON_RELEASE_MASK);
+
+  g_signal_connect(G_OBJECT(window), "delete-event", G_CALLBACK(delete_cb), NULL);
+
+  g_signal_connect(G_OBJECT(window), "key-press-event", G_CALLBACK (key_press_cb), NULL);
+  g_signal_connect(G_OBJECT(window), "key-release-event", G_CALLBACK (key_release_cb), NULL);
+  g_signal_connect(G_OBJECT(drawing_area), "motion-notify-event", G_CALLBACK (motion_cb), NULL);
+  g_signal_connect(G_OBJECT(drawing_area), "button-press-event", G_CALLBACK (button_cb), NULL);
+  g_signal_connect(G_OBJECT(drawing_area), "button-release-event", G_CALLBACK (button_cb), NULL);
 
   g_signal_connect(G_OBJECT(drawing_area),"configure-event", G_CALLBACK (configure_cb), NULL);
   g_signal_connect(G_OBJECT(drawing_area), "draw", G_CALLBACK(draw_screen_cb), NULL);
@@ -206,7 +227,8 @@ void draw() {
 enum {
     PRIM_WRITE,
     PRIM_DRAW,
-    PRIM_CATCHUP
+    PRIM_CATCHUP,
+    PRIM_SAVE_SHEET
 };
 
 uint16_t disp_prim_group_cb(uint8_t prim) {
@@ -217,15 +239,17 @@ uint16_t disp_prim_group_cb(uint8_t prim) {
     switch(prim) {
         case PRIM_WRITE:
             temp = item(&argstack, n--); // target screen data location
-            str = item(&argstack, n--);
-            while(memory[str] != 0) {
-              if(memory[str] == '\n') {
-                temp = (temp / SCREEN_WIDTH) * SCREEN_WIDTH + (SCREEN_WIDTH-1); // set cursor to new line (TODO does not compute end of screen!)
-              } else {
-                memory[temp] = memory[str];
+            while (n > 1) {
+              str = item(&argstack, n--);
+              while(memory[str] != 0) {
+                if(memory[str] == '\n') {
+                  temp = (temp / SCREEN_WIDTH) * SCREEN_WIDTH + (SCREEN_WIDTH-1); // set cursor to new line (TODO does not compute end of screen!)
+                } else {
+                  memory[temp] = memory[str];
+                }
+                temp++;
+                str++;
               }
-              temp++;
-              str++;
             }
             result = temp; // return cursor position
             break;
@@ -243,6 +267,11 @@ uint16_t disp_prim_group_cb(uint8_t prim) {
             } while(this_time.tv_sec == last_time.tv_sec && (this_time.tv_nsec >> 24) == (last_time.tv_nsec >> 24));
             last_time = this_time;
             break;
+        case PRIM_SAVE_SHEET:
+            // Utility function specific to the editor
+            temp = item(&argstack, n--);
+            quickwrite_2bitmap("out.bmp", &memory[temp], (uint32_t *) &memory[item(&argstack, n--)]);
+            break;
     }
 
     if (n != 1) printf("WARN: %d leftover args\n", n);
@@ -254,10 +283,14 @@ void register_display_prims() {
     uint8_t group = add_primitive_group(disp_prim_group_cb);
 
     direction = add_variable("direction", 0);
+    pointer_x = add_variable("pointer_x", 0);
+    pointer_y = add_variable("pointer_y", 0);
+    click = add_variable("click", 0);
 
     add_variable("write", add_primitive(group | PRIM_WRITE));
     add_variable("draw", add_primitive(group | PRIM_DRAW));
     add_variable("catchup", add_primitive(group | PRIM_CATCHUP));
+    add_variable("save_sheet", add_primitive(group | PRIM_SAVE_SHEET));
 
     clock_gettime(CLOCK_REALTIME, &last_time);
 }
@@ -267,8 +300,8 @@ int main (int argc, char ** argv) {
     register_display_prims();
 
     // Fill ascii
-    quickread_2bitmap("assets/ascii1.bmp", (char *) &memory[0x5000], (uint32_t *) &memory[PALETTE_MEM]);
-    quickread_2bitmap("assets/ascii2.bmp", (char *) &memory[0x5400], (uint32_t *) &memory[PALETTE_MEM]);
+    quickread_2bitmap("assets/ascii1.bmp", &memory[0x5000], (uint32_t *) &memory[PALETTE_MEM]);
+    quickread_2bitmap("assets/ascii2.bmp", &memory[0x5400], (uint32_t *) &memory[PALETTE_MEM]);
 
     display_init(argc, argv);
 

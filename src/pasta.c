@@ -79,27 +79,35 @@ Variable * add_variable(char * name, uint16_t value) {
     return add_var(unique_string(name), value);
 }
 
-uint16_t set_var(uint16_t name, uint16_t value) {
-    int i = vars_end-sizeof(Variable);
-    Variable * var = (Variable *) &memory[i];
-    while(var->name != name) {
-      i -= sizeof(Variable);
-      if (i<VARS_START) { printf("Var not found: %d\n", name); return 0; }
-      var = (Variable *) &memory[i];
-    }
-    var->value = value;
-    return i;
-}
-
 Variable * lookup_variable(uint16_t name) {
     for (int i=vars_end-sizeof(Variable);i>=VARS_START;i-=sizeof(Variable)) {
         Variable * var = (Variable *) &memory[i];
         if(var->name == name) return var;
     }
-
-    printf("Var not found: %d\n", name);
-    return (Variable *) &memory[VARS_START]; // false
+    // Not found
+    if (name >= STRING_START && name < MAX_STRING) {
+        printf("Var not found: %s\n", (char *) (&memory[name])); // may reasonably assume name string ref is ok
+    } else {
+        printf("Var not found: %d\n", name);
+    }
+    return NULL;
 }
+
+Variable * safe_lookup_var(uint16_t name) {
+    Variable * var = lookup_variable(name);
+    if (var == NULL) return (Variable *) (&memory[VARS_START]); // return false
+    else return var;
+}
+
+uint16_t set_var(uint16_t name, uint16_t value) {
+    Variable * var = lookup_variable(name);
+    if(var != NULL) {
+        var->value = value;
+        return 1;// memory-((uint8_t*) var);
+    }
+    return 0;
+}
+
 
 uint8_t add_primitive_group(PrimGroupCb cb) {
     uint8_t result = prim_group_len << 5;
@@ -217,7 +225,7 @@ void run_code(unsigned char * code, int length, bool toplevel, bool from_stdin) 
                 break;
             case CMD_REF:
                 //printf("ref %d\n", value);
-                push(&argstack, lookup_variable(value)->value);
+                push(&argstack, safe_lookup_var(value)->value);
                 break;
             case CMD_SKIP:
                 //printf("skip %d\n", value);
