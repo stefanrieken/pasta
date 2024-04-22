@@ -175,7 +175,7 @@ typedef struct Sprite {
 } Sprite;
 
 // Draw out sprite memory
-void draw() {
+void draw(int from_x, int from_y, int width, int height) {
   uint8_t * pixels = cairo_image_surface_get_data(surface);
   int rowstride = cairo_image_surface_get_stride(surface);
 
@@ -194,10 +194,13 @@ void draw() {
       int width_map = sprite->width; //(sprite->width + 7) / 8; // Even if width and height are not byte aligned, their map data is
 
       for (int i=0; i<sprite->height*8*scaley;i++) {
+        if (sprite->y+i < from_y || sprite->y+i >from_y+height) continue; // Some attempt to skip parts that don't need drawing
+
         // Try to get some (partial) calculations before the next for loop, to avoid repetition
         int map_idx_h = sprite->tiles + (i/(8*scaley))*width_map;
         for (int j=0; j<sprite->width*8*scalex; j++) {
-          //if(sprite->x+j > 255) { continue; }
+          if (sprite->x+j < from_x || sprite->x+j >from_x+width) continue; // Some attempt to skip parts that don't need drawing
+
           uint8_t tile_idx = memory[sprite->map + map_idx_h + j/(8*scalex)];
           // Say tile idx = 50; i = 25; j = 30
           // Tile 50 starts at tiles + (50 / 8 tiles per line) * 16*8 bytes per tile + (50%8)*2 bytes
@@ -219,9 +222,11 @@ void draw() {
     }
   }
 
-  // Redraw full stcreen
-  cairo_surface_mark_dirty_rectangle(surface, 0, 0, SCREEN_WIDTH*8*SCALE, SCREEN_WIDTH*8*SCALE);
-  gtk_widget_queue_draw_area(drawing_area, 0, 0, SCREEN_HEIGHT*8*SCALE, SCREEN_HEIGHT*8*SCALE);
+  // Redraw selected area (NOTE: we actually still ignored the area selection in the sprite drawing just before!)
+//  cairo_surface_mark_dirty(surface);
+  cairo_surface_mark_dirty_rectangle(surface, from_x*SCALE, from_y*SCALE, width*SCALE, height*SCALE);
+//  gtk_widget_queue_draw_area(drawing_area, 0, 0, 256*SCALE, 256*SCALE);
+  gtk_widget_queue_draw_area(drawing_area, from_x*SCALE, from_y*SCALE, width*SCALE, height*SCALE);
 }
 
 enum {
@@ -235,6 +240,8 @@ uint16_t disp_prim_group_cb(uint8_t prim) {
     uint16_t n = peek(&argstack);
     uint16_t temp = 0, str = 0;
     uint16_t result = 0;
+
+    uint16_t from_x = 0, from_y = 0, to_x = 255, to_y = 255;
 
     switch(prim) {
         case PRIM_WRITE:
@@ -254,7 +261,11 @@ uint16_t disp_prim_group_cb(uint8_t prim) {
             result = temp; // return cursor position
             break;
         case PRIM_DRAW:
-            draw();
+            if (n > 1) from_x = item(&argstack, n--);
+            if (n > 1) from_y = item(&argstack, n--);
+            if (n > 1) to_x = item(&argstack, n--);
+            if (n > 1) to_y = item(&argstack, n--);
+            draw(from_x, from_y, to_x, to_y);
             break;
         case PRIM_CATCHUP:
             // Make sure we don't exceed refresh rate, but if we lagged, we actually won't catch up on that

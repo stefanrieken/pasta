@@ -38,6 +38,7 @@ page 0
 define "tilemem" 0x5000
 define "color" 0b00
 
+
 loop {
     if (return click) {
         if (&& (>= pointer_x 64) (< pointer_y 192)) {
@@ -51,7 +52,8 @@ loop {
 
             #prints "painting"; print byte;
             setb tilemem (* (getb sheet) 16) byte (| (& (getb tilemem (* (getb sheet) 16) byte) (~ mask)) value);
-            draw;
+
+            draw (+ (* x 3) 64) (* y 3) 3 3;  # redraw affected area only
         };
         if (&& (< pointer_x 64) (>= pointer_y 0) (< pointer_y 24)) {
             set "click" 0;
@@ -64,7 +66,7 @@ loop {
             set "click" 0; # stop repeats
             set "color" (& (+ color 1) 0b11);
             setb color_spr colors0 color;
-            draw
+            draw 48 32 8 8 # redraw color sprite only
         };
         if (&& (< pointer_x 64) (>= pointer_y 48) (< pointer_y 72)) {
             set "click" 0; # stop repeats
@@ -72,6 +74,18 @@ loop {
             setb (+ screen 0x0E6) (+ 0x30 (/ (getb sheet) 64));
             draw
         }
+    } {
+         if (&& (>= pointer_x 64) (< pointer_y 192)) {
+            define "x" (/ (- pointer_x 64) 3); # offset on screen
+            define "y" (/ pointer_y 3); # and scale
+
+            setb (+ screen 1019) (+ (/ x 10) 48); # 48 = '0'
+            setb (+ screen 1020) (+ (% x 10) 48);
+            setb (+ screen 1021) 47; # '/'
+            setb (+ screen 1022) (+ (/ y 10) 48);
+            setb (+ screen 1023) (+ (% y 10) 48);
+            draw 215 247 40 8 # redraw affected area only
+        };
     };
     catchup;
     return true

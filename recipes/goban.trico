@@ -9,6 +9,9 @@ define "stones_spr" (sprite 2)
 define "stones" (+ goban (* 19 19))
 setallb stones_spr 8 8 19 19 (lsb stones) (msb stones) 0 0x01 0x02 0x11
 
+# These are simple liberties, i.e.: one free point can count up to 4x double
+define "liberties" (+ stones (* 19 19))
+
 define "move_spr" (sprite 3)
 define "move_tile" (+ liberties (* 19 19))
 setallb move_spr 112 0 1 1 (lsb move_tile) (msb move_tile) 0 0x01 0x02 0x11
@@ -82,28 +85,25 @@ set "cursor" (write cursor "Well this is fun.\n")
 
 draw
 
-# These are simple liberties, i.e.: one free point can count up to 4x double
-define "liberties" (+ stones (* 19 19))
-
-
-# propagate new value over fully connected shape
+# propagate new liberty count over fully connected shape;
+# optionally remove stones if count is zero
 define "floodfill" {
-    args "color" "value" "x" "y";
+    args "color" "value" "x" "y" "remove";
     if (&& (>= x 1) (>= y 1) (<= x 19) (<= y 19) (= (getb stones (point x y)) color) (! (= (getb liberties (point x y)) value)) ) {
         setb liberties (point x y) value;
-        if (= value 0) {
+        if (& (return remove) (= value 0)) {
             setb stones (point x y) 0; # capture
             # increase liberties of surrounding groups
             define "opposite" (if (= color 0x13) { return 0x0b } { return 0x13 });
-            floodfill opposite (+ (getb liberties (point x (- y 1))) 1) x (- y 1);
-            floodfill opposite (+ (getb liberties (point (- x 1) y)) 1) (- x 1) y;
-            floodfill opposite (+ (getb liberties (point x (+ y 1))) 1) x (+ y 1);
-            floodfill opposite (+ (getb liberties (point (+ x 1) y)) 1) (+ x 1) y;
+            floodfill opposite (+ (getb liberties (point x (- y 1))) 1) x (- y 1) false;
+            floodfill opposite (+ (getb liberties (point (- x 1) y)) 1) (- x 1) y false;
+            floodfill opposite (+ (getb liberties (point x (+ y 1))) 1) x (+ y 1) false;
+            floodfill opposite (+ (getb liberties (point (+ x 1) y)) 1) (+ x 1) y false;
         };
-        floodfill color value x (- y 1);
-        floodfill color value (- x 1) y;
-        floodfill color value x (+ y 1);
-        floodfill color value (+ x 1) y;
+        floodfill color value x (- y 1) remove;
+        floodfill color value (- x 1) y remove;
+        floodfill color value x (+ y 1) remove;
+        floodfill color value (+ x 1) y remove;
     }
 }
 
@@ -112,7 +112,9 @@ define "added_value" {
     args "color" "x" "y";
     if (&& (>= x 1) (>= y 1) (<= x 19) (<= y 19)) {
         if (= color (getb stones (point x y))) {
-            - (getb liberties (point x y)) 1
+            define "result" (- (getb liberties (point x y)) 1);
+            floodfill color 0 x y false; # Ensure we don't count the same group again later; we set the actual new liberty in the end
+            return result
         } {
             if (= 0 (getb stones (point x y))) {
                 return 1
@@ -127,23 +129,24 @@ define "play" {
 
     # Subtract a liberty from connected opposite stones
     define "opposite" (if (= color 0x13) { return 0x0b } { return 0x13 });
-    floodfill opposite (- (getb liberties (point x (- y 1))) 1) x (- y 1);
-    floodfill opposite (- (getb liberties (point (- x 1) y)) 1) (- x 1) y;
-    floodfill opposite (- (getb liberties (point x (+ y 1))) 1) x (+ y 1);
-    floodfill opposite (- (getb liberties (point (+ x 1) y)) 1) (+ x 1) y;
+    floodfill opposite (- (getb liberties (point x (- y 1))) 1) x (- y 1) true;
+    floodfill opposite (- (getb liberties (point (- x 1) y)) 1) (- x 1) y true;
+    floodfill opposite (- (getb liberties (point x (+ y 1))) 1) x (+ y 1) true;
+    floodfill opposite (- (getb liberties (point (+ x 1) y)) 1) (+ x 1) y true;
 
     define "newval" 0;
-    add "newval" (added_value color x (- y 1));
-    add "newval" (added_value color (- x 1) y);
-    add "newval" (added_value color x (+ y 1));
-    add "newval" (added_value color (+ x 1) y);
+    add "newval" (added_value color x (- y 1)); # prints "top   : "; print newval;
+    add "newval" (added_value color (- x 1) y); # prints "left  : "; print newval;
+    add "newval" (added_value color x (+ y 1)); # prints "bottom: "; print newval;
+    add "newval" (added_value color (+ x 1) y); # prints "right : "; print newval;
 
-    # prints "Liberties: ";
-    # print newval;
+    # prints (if (= color 0x13) { return "b " } { return "w " });
+    # print x y newval;
+
     setb stones (point x y) color;
     setb move_tile opposite;
-    floodfill color 0xFF x y; # First fill with unique value to give flood fill a stop condition
-    floodfill color newval x y; # Then fill with actual value
+    floodfill color 0xFF x y false; # First fill with unique value to give flood fill a stop condition
+    floodfill color newval x y false; # Then fill with actual value
 }
 
 loop {
