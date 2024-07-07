@@ -2,7 +2,8 @@
 
 define "cursor" (write screen "\x7FTricolore\n\n")
 add "cursor" 1;
-set "cursor" (write cursor "Hello, world!\n")
+set "cursor" (write cursor "\x0FHello\x10, world!\n")
+
 # Do a few bricks
 add "cursor" 1; # leave a hole
 loop {

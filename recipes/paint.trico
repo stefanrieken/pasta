@@ -12,14 +12,26 @@ button "save  "
 button "color "
 button "page 0"
 
-define "sheet_spr" (sprite 1)
 define "sheet" (* 31 1024)
-setallb sheet_spr 64 0 8 8 (lsb sheet) (msb sheet) 0 0xA0 0x10 0x32 # set transparent=none; default color scheme
+define "sheet_spr" (sprite 1)
+setallb sheet_spr 64 0 8 8 (lsb sheet) (msb sheet) 0 0xA0 0x10 0x32 # set transparent=none; # default color scheme
 
-define "color_spr" (sprite 2)
 define "colorref" (+ sheet 256)
+write colorref "0"
+define "color_spr" (sprite 2)
 setallb color_spr 48 32 1 1 (lsb colorref) (msb colorref) 0 0x00 0x10 0x32
-#write colorref "x"
+
+define "paletteref" (+ colorref 1)
+setallb paletteref 0b00000000 0b01000000 0b10000000 0b11000000
+
+define "paletteref_spr0" (sprite 3)
+setallb paletteref_spr0 64 208 4 1 (lsb paletteref) (msb paletteref) 2 0x50 0x10 0x32
+define "paletteref_spr1" (sprite 4)
+setallb paletteref_spr1 128 208 4 1 (lsb paletteref) (msb paletteref) 2 0x50 0x54 0x76
+define "paletteref_spr2" (sprite 5)
+setallb paletteref_spr2 64 224 4 1 (lsb paletteref) (msb paletteref) 2 0x50 0x98 0xBA
+define "paletteref_spr3" (sprite 6)
+setallb paletteref_spr3 128 224 4 1 (lsb paletteref) (msb paletteref) 2 0x50 0xDC 0xFE
 
 define "page" {
     args "n";
@@ -36,7 +48,7 @@ define "page" {
 page 0
 
 define "tilemem" 0x5000
-define "color" 0b00
+define "color_idx" 0b00
 
 
 loop {
@@ -64,9 +76,12 @@ loop {
         };
         if (&& (< pointer_x 64) (>= pointer_y 24) (< pointer_y 48)) {
             set "click" 0; # stop repeats
-            set "color" (& (+ color 1) 0b11);
-            setb color_spr colors0 color;
-            draw 48 32 8 8 # redraw color sprite only
+            set "color_idx" (& (+ color_idx 1) 0b11); # Adjust active color.
+            setb colorref (+ 48 color_idx); # Set color number
+            # Adjust colorref background
+            if (= color_idx 0) { setb color_spr colors0 0x10 } # don't have the same background (color 0) as foreground color
+             { setb color_spr colors0 color_idx };
+            draw 48 32 8 8 # redraw color_idx sprite only
         };
         if (&& (< pointer_x 64) (>= pointer_y 48) (< pointer_y 72)) {
             set "click" 0; # stop repeats

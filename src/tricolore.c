@@ -169,8 +169,8 @@ typedef struct Sprite {
   uint8_t width;
   uint8_t height;
   uint16_t map; // location of map in memory. Must be 16 bit, otherwise granularity is way off
-  uint8_t tiles; // location of tiles. Could be 8 bit to indicate a 1k (64 tile) aligned space
-  uint8_t flags;
+  uint8_t mode; // 6-bit (MSB) location of tiles (presently offset from 20k = 0x5000) + 2-bit mode
+  uint8_t flags; // msb->lsb: scaley (2b) scalex (2b), transparent (4b);
   uint16_t colors; // 4x index into 4-bit color palette
 } Sprite;
 
@@ -197,17 +197,35 @@ void draw(int from_x, int from_y, int width, int height) {
         if (sprite->y+i < from_y || sprite->y+i >from_y+height) continue; // Some attempt to skip parts that don't need drawing
 
         // Try to get some (partial) calculations before the next for loop, to avoid repetition
-        int map_idx_h = sprite->tiles + (i/(8*scaley))*width_map;
+        int map_idx_h = (i/(8*scaley))*width_map;
         for (int j=0; j<sprite->width*8*scalex; j++) {
           if (sprite->x+j < from_x || sprite->x+j >from_x+width) continue; // Some attempt to skip parts that don't need drawing
 
+          // Normal mode: 8-bit tiles
           uint8_t tile_idx = memory[sprite->map + map_idx_h + j/(8*scalex)];
+          uint8_t colormask = 0;
+
+          switch (sprite->mode & 0b11) {
+              case 1: // Invertible mode: 7-bit tile addressing with 1-bit inverse marker
+                  colormask = (tile_idx & (1 << 7)) ? 0b01 : 0b00; // Only invert the 	MSB
+                  tile_idx &= 0b01111111;
+                  break;
+              case 2: // Colormask mode: 6-bit tile addressing with 2-bit XOR color mask
+                  colormask = tile_idx >> 6;
+                  tile_idx &= 0b111111;
+                  break;
+              case 3: // TBD
+                  break;
+          }
+
           // Say tile idx = 50; i = 25; j = 30
           // Tile 50 starts at tiles + (50 / 8 tiles per line) * 16*8 bytes per tile + (50%8)*2 bytes
           // Also need to get to the right line of this tile for the current pixel; add (i%8) * 16 bytes per line
           // Then we need to pick out the right byte depending on the current bit written:
           uint8_t byte_idx = ((j/scalex) % 8) < 4 ? 0 : 1;
-          uint8_t tile_data = memory[(20+sprite->tiles)*1024 + (tile_idx/8)*128+((i/scaley)%8)*16 + ((tile_idx%8))*2 + byte_idx];
+          uint8_t tile_data = memory[(20+(sprite->mode & 0b11111100))*1024 + (tile_idx/8)*128+((i/scaley)%8)*16 + ((tile_idx%8))*2 + byte_idx];
+
+
           int pxdata = (tile_data >> ((3-((j/scalex)%4))*2)) & 0b11;
 
           int pixel_idx = (((sprite->y+i)%256)*rowstride) + (((sprite->x+j)%256)*4); // The %256 rotates pixels on a 32x8 wide display
@@ -215,6 +233,7 @@ void draw(int from_x, int from_y, int width, int height) {
           // TODO palette
           if (!(transparent & (1 << pxdata))) {
               int color = (sprite->colors >> (pxdata*4)) & 0b1111;
+              color ^= colormask;
               *((uint32_t *) pixel) = palette[color]; // TODO get palette into user mem registers
           }
         }
@@ -246,15 +265,20 @@ uint16_t disp_prim_group_cb(uint8_t prim) {
     switch(prim) {
         case PRIM_WRITE:
             temp = item(&argstack, n--); // target screen data location
+            uint8_t inverse = 0;
             while (n > 1) {
               str = item(&argstack, n--);
               while(memory[str] != 0) {
                 if(memory[str] == '\n') {
-                  temp = (temp / SCREEN_WIDTH) * SCREEN_WIDTH + (SCREEN_WIDTH-1); // set cursor to new line (TODO does not compute end of screen!)
+                  temp = (temp / SCREEN_WIDTH) * SCREEN_WIDTH + (SCREEN_WIDTH); // set cursor to new line (TODO does not compute end of screen!)
+                } else if (memory[str] == 0x0f) { // 'shift out': used for inverse (may also be used to end reverse)
+                  inverse ^= 0b10000000;
+                } else if (memory[str] == 0x10) { // 'shift in': used to end reverse
+                  inverse = 0;
                 } else {
-                  memory[temp] = memory[str];
+                  memory[temp] = memory[str] | inverse;
+                  temp++;
                 }
-                temp++;
                 str++;
               }
             }
