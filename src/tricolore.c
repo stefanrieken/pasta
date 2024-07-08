@@ -207,14 +207,14 @@ void draw(int from_x, int from_y, int width, int height) {
 
           switch (sprite->mode & 0b11) {
               case 1: // Invertible mode: 7-bit tile addressing with 1-bit inverse marker
-                  colormask = (tile_idx & (1 << 7)) ? 0b01 : 0b00; // Only invert the 	MSB
+                  colormask = (tile_idx & (1 << 7)) ? 0b01 : 0b00; // Only invert the MSB
                   tile_idx &= 0b01111111;
                   break;
-              case 2: // Colormask mode: 6-bit tile addressing with 2-bit XOR color mask
+              case 2: // Colormask mode: 6-bit tile addressing with 2-bit XOR color mask; this allows for different colorings of the same tiles (within the given 4 colors)
                   colormask = tile_idx >> 6;
                   tile_idx &= 0b111111;
                   break;
-              case 3: // TBD
+              case 3: // TBD (proposal: sprite struct selection mode, to allow for more than 4 colors in a game map by letting different sprites draw different parts)
                   break;
           }
 

@@ -50,3 +50,38 @@ colour 12 0x34 0x3b 0x98 # Navy
 colour 13 0x16 0x4b 0x17 # Forest
 colour 14 0xaa 0xc1 0x81 # Fern
 colour 15 0x69 0x7e 0x02 # Olive
+
+
+define "set_sprite_color" {
+    args "sprite" "color_idx" "colornum";
+    if (= color_idx 0) {
+      setb sprite colors0 (| (& (getb sprite colors0) 0xF0) colornum)
+    };
+    if (= color_idx 1) {
+      setb sprite colors0 (| (& (getb sprite colors0) 0x0F) (<< colornum 4))
+    };
+    if (= color_idx 2) {
+      setb sprite colors1 (| (& (getb sprite colors1) 0xF0) colornum)
+    };
+    if (= color_idx 3) {
+      setb sprite colors1 (| (& (getb sprite colors1) 0x0F) (<< colornum 4))
+    };
+}
+
+define "get_sprite_color" {
+    args "sprite" "color_idx";
+    define "result" 0;
+    if (= color_idx 0) {
+        set "result" (& (getb sprite colors0) 0x0F)
+    };
+    if (= color_idx 1) {
+        set "result" (>> (getb sprite colors0) 4)
+    };
+    if (= color_idx 2) {
+        set "result" (& (getb sprite colors1) 0x0F)
+    };
+    if (= color_idx 3) {
+        set "result" (>> (getb sprite colors1) 4)
+    };
+    return result
+}

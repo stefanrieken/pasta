@@ -33,6 +33,7 @@ setallb paletteref_spr2 64 224 4 1 (lsb paletteref) (msb paletteref) 2 0x50 0x98
 define "paletteref_spr3" (sprite 6)
 setallb paletteref_spr3 128 224 4 1 (lsb paletteref) (msb paletteref) 2 0x50 0xDC 0xFE
 
+
 define "page" {
     args "n";
     define "i" 0;
@@ -50,6 +51,11 @@ page 0
 define "tilemem" 0x5000
 define "color_idx" 0b00
 
+define "adjust_colorref" {
+    set_sprite_color color_spr 0 (get_sprite_color sheet_spr color_idx);
+    if (= color_idx 0) { set_sprite_color color_spr 1 (get_sprite_color sheet_spr 1) }  # don't have the same background (color 0) as foreground color
+    { set_sprite_color color_spr 1 0 }; # in other cases, use color 0
+}
 
 loop {
     if (return click) {
@@ -60,7 +66,7 @@ loop {
             define "byte" (+ (* y 16) (/ x 4));
             define "bits" (* (% x 4) 2);
             define "mask" (<< 0b11 (- 6 bits));
-            define "value"  (<< color (- 6 bits));
+            define "value"  (<< color_idx (- 6 bits));
 
             #prints "painting"; print byte;
             setb tilemem (* (getb sheet) 16) byte (| (& (getb tilemem (* (getb sheet) 16) byte) (~ mask)) value);
@@ -77,16 +83,21 @@ loop {
         if (&& (< pointer_x 64) (>= pointer_y 24) (< pointer_y 48)) {
             set "click" 0; # stop repeats
             set "color_idx" (& (+ color_idx 1) 0b11); # Adjust active color.
-            setb colorref (+ 48 color_idx); # Set color number
-            # Adjust colorref background
-            if (= color_idx 0) { setb color_spr colors0 0x10 } # don't have the same background (color 0) as foreground color
-             { setb color_spr colors0 color_idx };
+            setb colorref (+ 48 color_idx); # Set color number (ascii '0' = 48)
+            adjust_colorref;
             draw 48 32 8 8 # redraw color_idx sprite only
         };
         if (&& (< pointer_x 64) (>= pointer_y 48) (< pointer_y 72)) {
             set "click" 0; # stop repeats
             page (+ (getb sheet) 64);
             setb (+ screen 0x0E6) (+ 0x30 (/ (getb sheet) 64));
+            draw
+        };
+        if (&& (>= pointer_x 64) (< pointer_x 192) (>= pointer_y 208) (< pointer_y 240)) {
+            set "click" 0; # stop repeats
+            define "colornum" (+ (/ (- pointer_x 64) 16) (* (/ (- pointer_y 208) 16) 8));
+            set_sprite_color sheet_spr color_idx colornum;
+            adjust_colorref;
             draw
         }
     } {
