@@ -230,11 +230,9 @@ void draw(int from_x, int from_y, int width, int height) {
 
           int pixel_idx = (((sprite->y+i)%256)*rowstride) + (((sprite->x+j)%256)*4); // The %256 rotates pixels on a 32x8 wide display
           uint8_t * pixel = &pixels[pixel_idx];
-          // TODO palette
           if (!(transparent & (1 << pxdata))) {
-              int color = (sprite->colors >> (pxdata*4)) & 0b1111;
-              color ^= colormask;
-              *((uint32_t *) pixel) = palette[color]; // TODO get palette into user mem registers
+              int color = (sprite->colors >> ((pxdata ^ colormask) *4)) & 0b1111;
+              *((uint32_t *) pixel) = palette[color];
           }
         }
       }
