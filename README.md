@@ -18,7 +18,7 @@ Pasta is simple but substantial:
 
 Pasta is nostalgic, and highly tangible:
 - 8/16-bit Pasta directly accesses 64k of sequential memory
-- This includes machine registers and interpreter code and state
+- This includes code and (some) interpreter 'machine state'
 - Data abstractions are deliberately thin, but practical
 - Poking and peeking is encouraged
 - You can't really break stuff (that can't be fixed by a 'reset')
@@ -31,18 +31,20 @@ colors (or 3 colors plus transparency) out of a system wide 16-color pallete.
 
 
 ## Status
-With experience from similar recipes, Pasta was cooked up on a whim, but is
-already starting to feel close to _al dente_, especially when considering that
-its quirky 80's vibe is a feature, not a bug.
+Having had experience with similar recipes, Pasta was cooked up on a whim, but
+is already starting to feel close to _al dente_, especially when considering
+that its quirky 80's vibe is a feature, not a bug.
 
-Work on Tricolore has only just started.
+Tricolore proves the ideal companion to both the language and its vibe. With a
+growing number of self-hosted utility programs it is quickly turning the corner
+to becoming a viable retroprogramming platform.
 
-In both subsystems, memory for all of the different features and registers has
-been allocated haphazardly, and is in need of being organized.
+In both Pasta and Tricolore, memory for all of the different features and
+registers has been allocated haphazardly, and is in need of being organized.
 
 ## Building, running and examples
-For the build to succeed, in addition to a regular C compiler, you need the GTK
-headers and libs. On a Mac install homebrew, and then run
+For the Tricolore build to succeed, in addition to a regular C compiler, you
+need the GTK headers and libs. On a Mac install homebrew, and then run
 `brew install gtk+ pkg-config`.
 
 Next, typing 'make' should produce 2 local executables:

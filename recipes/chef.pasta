@@ -10,18 +10,27 @@
 
 enum "PastaMachineType" "TricoloreMachineType";
 enum "GenericFileType" "MapFileType";
-enum "GeneralStorageChunkType";
+enum "GeneralStorageChunkType" "TileMemChunkType";
 enum "NoAddress" "AbsoluteAddress" "RelativeAddress" "AppendAddress";
 
 # Write file
 
 define "file" (make_chunkf "test.chef" 0 PastaMachineType MapFileType 0)
-write_chunk file PastaMachineType GeneralStorageChunkType 0 AbsoluteAddress 0x5000 0x1000 # Should write tile mem (run with Tricolore to see the effect)
+write_chunk file TricoloreMachineType TileMemChunkType 0 AbsoluteAddress 0x5000 0x1000 # Should write tile mem (run with Tricolore to see the effect)
+#write_chunk file TricoloreMachineType TileMemChunkType 0 RelativeAddress 0x5000 0x1000 # Should write tile mem (run with Tricolore to see the effect)
 close_chunkf file
+
+# Prove something by clearing memory
+define "i" 0
+loop {
+    setb 0x5000 i 0;
+    add "i" 1;
+    < i 0x1000
+}
 
 # Read file
 #
-# This uses two callbacks:
+# This uses two optional callbacks:
 # - For the general header
 # - For each chunk
 
