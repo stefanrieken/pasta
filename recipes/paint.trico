@@ -17,6 +17,19 @@ define "sheet" (* 31 1024)
 define "sheet_spr" (sprite 1)
 setallb sheet_spr 64 0 8 8 (lsb sheet) (msb sheet) 0 0xA0 0x10 0x32 # set transparent=none; # default color scheme
 
+# Fill the empty pages with a raster
+define "i" 0x5871 # tilemem
+loop {
+    define "j" 0;
+    loop {
+        setb i j 1;
+        add "j" 2;
+        < j 16
+    };
+    add "i" 128;
+    < i 0x6000
+}
+
 define "colorref" (+ sheet 256)
 write colorref "0"
 define "color_spr" (sprite 2)

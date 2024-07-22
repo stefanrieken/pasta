@@ -1,4 +1,4 @@
-#!/path/to/selfless
+#!/path/to/pasta
 
 define "hello" {
     args "name";

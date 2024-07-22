@@ -41,14 +41,14 @@ extern uint8_t * memory;
 
 #define MAX_MEM (64 * 1024)
 
-#define CODE_START (1 * 1024)
+#define CODE_START 0x0400
 
-#define STRING_START (5 * 1024)
+#define STRING_START 0x2400
 #define MAX_CODE (STRING_START - CODE_START)
 extern int code_end;
 extern int main_start;
 
-#define VARS_START 8 * 1024
+#define VARS_START 0x3000
 #define MAX_STRING (VARS_START - STRING_START)
 
 #define MAX_VARS (MAX_MEM - VARS_START)

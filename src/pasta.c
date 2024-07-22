@@ -9,6 +9,7 @@
 #include "stack.h"
 #include "base.h"
 #include "int.h"
+#include "chef.h"
 
 uint8_t * memory;
 
@@ -420,6 +421,7 @@ void pasta_init() {
 
     register_base_prims();
     register_int_prims();
+    register_chef_prims();
 }
 
 void * mainloop(void * arg) {

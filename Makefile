@@ -1,5 +1,5 @@
 CFLAGS=-Wall -Wunused -ffunction-sections -fdata-sections
-OBJS=src/stack.o src/base.o src/int.o src/pasta.o
+OBJS=src/stack.o src/base.o src/int.o src/pasta.o src/chef.c
 
 %.o: %.c
 	$(CC) $(CFLAGS) -c $< -o $@ `pkg-config --cflags cairo gdk-3.0 gtk+-3.0 libpng`

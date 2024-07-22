@@ -18,7 +18,7 @@ GtkWidget * drawing_area;
 #define SCALE 2
 
 // palette register is placed after 16 sprites
-#define PALETTE_MEM 12 * 1024 + 16*16
+#define PALETTE_MEM 16 * 1024 + 16*16
 
 void delete_cb(GtkWidget *widget, GdkEventType *event, gpointer userdata) {
   // destroy any global drawing state here,
@@ -181,7 +181,7 @@ void draw(int from_x, int from_y, int width, int height) {
 
   // May not need to clear screen when redrawing full background / character screen
 
-  int spritemem = 12 * 1024; // just any location
+  int spritemem = 16 * 1024; // just any location
   uint32_t * palette = (uint32_t *) &memory[PALETTE_MEM];
 
   // 16 sprite structs of size 16 = 256 bytes
