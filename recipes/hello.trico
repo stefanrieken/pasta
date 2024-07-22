@@ -122,8 +122,7 @@ define "catwalk" {
             draw
         };
 
-        catchup;
-        return true
+        catchup
     }
 }
 

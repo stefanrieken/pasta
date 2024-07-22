@@ -18,8 +18,8 @@ setallb move_spr 112 0 1 1 (lsb move_tile) (msb move_tile) 0 0x01 0x02 0x11
 setb move_tile 0x13
 
 # for an outline (print) style:
-setb  goban_spr colors0 0x01; setb goban_spr colors1 0x02
-setb stones_spr colors1 0x01; setb  move_spr colors1 0x01
+#setb  goban_spr colors0 0x01; setb goban_spr colors1 0x02
+#setb stones_spr colors1 0x01; setb  move_spr colors1 0x01
 
 # This function maps coords so that they start at 1,
 # like a player would use them
@@ -167,7 +167,6 @@ loop {
             draw;
         }
     };
-    catchup;
-    return true
+    catchup
 }
 

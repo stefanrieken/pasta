@@ -154,6 +154,5 @@ loop {
             draw 215 247 40 8 # redraw affected area only
         };
     };
-    catchup;
-    return true
+    catchup
 }

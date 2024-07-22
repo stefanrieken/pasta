@@ -20,11 +20,15 @@ GtkWidget * drawing_area;
 // palette register is placed after 16 sprites
 #define PALETTE_MEM 16 * 1024 + 16*16
 
-void delete_cb(GtkWidget *widget, GdkEventType *event, gpointer userdata) {
+bool screen_active = false;
+
+bool delete_cb(GtkWidget *widget, GdkEventType *event, gpointer userdata) {
   // destroy any global drawing state here,
   // like the cairo surface (if we make it global)
   gtk_main_quit();
   cairo_surface_destroy(surface);
+  screen_active = false;
+  return false;
 }
 
 void configure_cb(GtkWidget * widget, GdkEventConfigure * event, gpointer data) {
@@ -299,6 +303,7 @@ uint16_t disp_prim_group_cb(uint8_t prim) {
                 clock_gettime(CLOCK_REALTIME, &this_time);
             } while(this_time.tv_sec == last_time.tv_sec && (this_time.tv_nsec >> 24) == (last_time.tv_nsec >> 24));
             last_time = this_time;
+            result = screen_active;
             break;
         case PRIM_SAVE_SHEET:
             // Utility function specific to the editor
@@ -345,10 +350,12 @@ int main (int argc, char ** argv) {
         fclose(infile);
     }
 
+    screen_active = true; // well, almost
+
     pthread_t worker_thread;
     pthread_create(&worker_thread, NULL, mainloop, &argv[1]);
 
     gtk_main();
 
-    // pthread_join(worker_thread, NULL);
+    pthread_join(worker_thread, NULL);
 }

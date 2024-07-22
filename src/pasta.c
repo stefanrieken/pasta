@@ -433,7 +433,7 @@ void * mainloop(void * arg) {
         parse(infile, true);
         fclose(infile);
     }
-    
+
     // Allow interactive running even after file args using "-"
     if (i == 0 || (args[i] != NULL && strcmp(args[i], "-") == 0)) {
         if (isatty(fileno(stdin))) {
