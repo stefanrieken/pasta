@@ -2,15 +2,14 @@
 # every 512 byte block whether or not part of it is in use,
 # showing all of memory in a 16*8 ascii art 'square'.
 
-prints "\nMemory usage in 512k blocks:\n\n";
+prints "\nMemory usage in (64x8=) 512b blocks:\n\n";
 define "i" 0;
 define "used" false;
 
 loop {
     set "used" (| used (!(= 0 (getb i))));
 
-#    if (= 63 (% i 64)) {
-    if (= 0x1FF (% i 0x200)) {
+    if (= 63 (% i 64)) {
         # print i;
         if used {
             prints "#"
@@ -19,13 +18,15 @@ loop {
         };
 
         set "used" false;
-
-        if (= 0x1FFF (% i 0x2000)) {
+        
+        if (= 0x1FF (% i 0x200)) {
             prints " ";
-            printx i;
-            # prints "\n"
-        }
-
+            if (= 0x0FFF (% i 0x1000)) {
+                if (< i 0x1000) { prints "0" };
+                printx i;
+                # prints "\n"
+            }
+        };
     };
 
     set "i" (+ 1 i);

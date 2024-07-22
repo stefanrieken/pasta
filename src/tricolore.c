@@ -167,6 +167,7 @@ void display_init(int argc, char ** argv) {
   gtk_widget_show_all(GTK_WIDGET(window));
 }
 
+// TODO: thought we already were cramped for space here, but we only use 10 of the 16 bytes available!
 typedef struct Sprite {
   uint8_t x;
   uint8_t y;
