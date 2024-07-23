@@ -1,10 +1,10 @@
 # ChEF is the Chunky Extensible File format
 #
-# This file writes, then reads 4k of memory starting at 0x5000.
+# This file writes, then reads 4k of memory starting at 0x6000.
 # On Tricolore, this should write and read the 4 basic pages of
-# tile memory; on plain Pasta this should just read and write a
+# tile memory, and you can test the effect by running paint.trico
+# afterwards. On plain Pasta this should just read and write a
 # lot of zeroes.
-
 
 # Define some relevant enums. Should likely move to lib
 
@@ -16,19 +16,19 @@ enum "NoAddress" "AbsoluteAddress" "RelativeAddress" "AppendAddress";
 # Write file
 
 define "file" (make_chunkf "test.chef" 0 PastaMachineType MapFileType 0)
-write_chunk file TricoloreMachineType TileMemChunkType 0 AbsoluteAddress 0x5000 0x1000 # Should write tile mem (run with Tricolore to see the effect)
-#write_chunk file TricoloreMachineType TileMemChunkType 0 RelativeAddress 0x5000 0x1000 # Should write tile mem (run with Tricolore to see the effect)
+write_chunk file TricoloreMachineType TileMemChunkType 0 AbsoluteAddress 0x6000 0x1000
+#write_chunk file TricoloreMachineType TileMemChunkType 0 RelativeAddress 0x6000 0x1000
 close_chunkf file
 
 # Prove something by clearing memory
 define "i" 0
 loop {
-    setb 0x5000 i 0;
+    setb 0x6000 i 0;
     add "i" 1;
     < i 0x1000
 }
 
-# Read file
+# Then read in the data again
 #
 # This uses two optional callbacks:
 # - For the general header

@@ -74,7 +74,7 @@ uint16_t base_prim_group_cb(uint8_t prim) {
             result = 0;
             break;
         case PRIM_CODE:
-            print_asm(&memory[CODE_START+main_start], code_end-main_start);
+            print_asm(&memory[mem[CODE]], mem[END_OF+CODE] - mem[CODE]);
             result = 0;
             break;
         case PRIM_IF:
@@ -131,7 +131,7 @@ uint16_t base_prim_group_cb(uint8_t prim) {
             // As we call another function to pop our own args,
             // the callstack is a bit crowded, e.g.: 2 "y" "x" <prim_args> 2 43 42
             // So define args first, then pop values
-            temp = vars_end;
+            temp = mem[TOP_OF+VARS];
             for (int i=0; i<n-1;i++) add_var(item(&argstack, n-i), 0);
             drop(&argstack, n+1); // include prim func reference, n
             for (int i=0; i<n-1;i++) ((Variable *) (&memory[temp]))[i].value = item(&argstack, n-i);

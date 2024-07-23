@@ -12,15 +12,8 @@
 #include "chef.h"
 
 uint8_t * memory;
+uint16_t * mem;
 
-int code_end;
-// We now compile code directly to memory as one big main function,
-// which starts after the primitive references.
-// Notice this presently still misses a proper skip_code header,
-// like we have for blocks (and primitive references are typed with a zero).
-int main_start;
-
-int vars_end;
 
 uint8_t prim_group_len;
 #define MAX_PRIM_GROUPS 8
@@ -31,11 +24,11 @@ PrimGroupCb prim_groups[MAX_PRIM_GROUPS];
  * @return relative pointer to string
  */
 uint16_t unique_string(char * string) {
-    int i = STRING_START;
+    int i = mem[STRINGS];
     while (memory[i] != 0) {
         if (strcmp(string, (char *) (&memory[i+1])) == 0) return i+1;
         i += memory[i]; // follow chain
-        if((i-STRING_START) >= MAX_STRING) { printf("String overflow!\n"); return 0; }
+        if(i >= mem[END_OF+STRINGS]) { printf("String overflow!\n"); return 0; }
     }
     // printf("Adding new string '%s' at pos %d\n", string, i);
 
@@ -46,13 +39,15 @@ uint16_t unique_string(char * string) {
     strcpy((char *) (&memory[result]), string);
     memory[i+len+1] = 0; // mark end of chain
 
+    mem[TOP_OF+STRINGS] = i+len+1; // Update top register even if we don't actively read it
+
     return result;
 }
 
 void ls() {
     printf("Known variables:");
-    int i = VARS_START;
-    while(i < vars_end) {
+    int i = mem[VARS];
+    while(i < mem[TOP_OF+VARS]) {
         Variable * var = (Variable *) &memory[i];
         printf(" %s (%d)", str(var->name), var->value);
         i += sizeof(Variable);
@@ -62,17 +57,17 @@ void ls() {
 
 void strings() {
     printf("Known strings:");
-    int i = STRING_START;
+    int i = mem[STRINGS];
     while(memory[i] != 0) { printf(" %s", &memory[i+1]); i += memory[i]; }
     printf("\n");
 }
 
 Variable * add_var(uint16_t name, uint16_t value) {
-    if (vars_end >= VARS_START+MAX_VARS) { printf("Variable overflow!\n"); return 0; }
-    Variable * var = (Variable *) &memory[vars_end];
+    if (mem[TOP_OF+VARS] >= mem[END_OF+VARS]) { printf("Variable overflow! %d %d\n", mem[TOP_OF+VARS], mem[END_OF+VARS]); return 0; }
+    Variable * var = (Variable *) &memory[mem[TOP_OF+VARS]];
     var->name = name;
     var->value = value;
-    vars_end += sizeof(Variable);
+    mem[TOP_OF+VARS] += sizeof(Variable);
     return var;
 }
 
@@ -81,12 +76,12 @@ Variable * add_variable(char * name, uint16_t value) {
 }
 
 Variable * lookup_variable(uint16_t name) {
-    for (int i=vars_end-sizeof(Variable);i>=VARS_START;i-=sizeof(Variable)) {
+    for (int i=mem[TOP_OF+VARS]-sizeof(Variable);i>=mem[VARS];i-=sizeof(Variable)) {
         Variable * var = (Variable *) &memory[i];
         if(var->name == name) return var;
     }
     // Not found
-    if (name >= STRING_START && name < MAX_STRING) {
+    if (name >= mem[STRINGS] && name < mem[END_OF+STRINGS]) {
         printf("Var not found: %s\n", (char *) (&memory[name])); // may reasonably assume name string ref is ok
     } else {
         printf("Var not found: %d\n", name);
@@ -96,7 +91,7 @@ Variable * lookup_variable(uint16_t name) {
 
 Variable * safe_lookup_var(uint16_t name) {
     Variable * var = lookup_variable(name);
-    if (var == NULL) return (Variable *) (&memory[VARS_START]); // return false
+    if (var == NULL) return (Variable *) (&memory[mem[VARS]]); // return false
     else return var;
 }
 
@@ -118,11 +113,9 @@ uint8_t add_primitive_group(PrimGroupCb cb) {
 
 uint16_t add_primitive(uint16_t prim) {
     //printf("Add prim %d at %d\n", prim, code_end);
-    memory[code_end] = 0; // Specify type 'primitive'
-    memory[code_end+1] = prim;
-    uint16_t result = code_end;
-    code_end += 2;
-    return result;
+    memory[mem[TOP_OF+CODE]++] = 0; // Specify type 'primitive'
+    memory[mem[TOP_OF+CODE]++] = prim;
+    return mem[TOP_OF+CODE]-2;
 }
 
 static inline
@@ -174,6 +167,8 @@ void print_asm(unsigned char * code, int code_end) {
 }
 
 void run_func(uint16_t func) {
+    // Avoid interpreting zeroes and other random (but hopefully low) functions
+    if (func < mem[CODE]) { printf("Invalid function reference.\n"); return; }
     uint8_t type = memory[func];
     uint16_t num_args = peek(&argstack);
     uint16_t result = 0;
@@ -196,7 +191,7 @@ void run_func(uint16_t func) {
 }
 
 void run_code(unsigned char * code, int length, bool toplevel, bool from_stdin) {
-    int saved_vars_end = vars_end;
+    int saved_vars_top = mem[TOP_OF+VARS];
     int saved_argstack = argstack.length;
 
     for (int i=0; i<length; i++) {
@@ -238,32 +233,29 @@ void run_code(unsigned char * code, int length, bool toplevel, bool from_stdin) 
 
     // Reset scope, argstack
     if (!toplevel) {
-        vars_end = saved_vars_end;
+        mem[TOP_OF+VARS] = saved_vars_top;
         int result = pop(&argstack);
         argstack.length = saved_argstack;
         push(&argstack, result);
     }
 }
 
-int add_command(unsigned char cmd, uint32_t value, unsigned char * code, int code_idx) {
-    int result;
+void add_command(unsigned char cmd, uint16_t value) {
     if (value > 59) {
         // Can't encode within 2^6 - 4
         // encode as 'word follows' (for now always 16-bit)
-        code[code_idx] = cmd | (WORD_FOLLOWS << 2);
+        memory[mem[TOP_OF+CODE]++] = cmd | (WORD_FOLLOWS << 2);
         // Just piggybacking on system endianness here
-        ((uint16_t *) (&code[code_idx+1]))[0] = value;
-        result = code_idx+3;
+        ((uint16_t *) (&memory[mem[TOP_OF+CODE]]))[0] = value;
+        mem[TOP_OF+CODE]+= 2;
     } else {
-        code[code_idx] = cmd | (value << 2);
-        result = code_idx+1;
+        memory[mem[TOP_OF+CODE]++] = cmd | (value << 2);
     }
-    if(result > MAX_CODE) printf("Code overflow!\n");
-    return result;
+    if(mem[TOP_OF+CODE] >= mem[END_OF+CODE]) printf("Code overflow!\n");
 }
 
 int parse_int(FILE * infile, int ch, int * result, int radix) {
-    // Allow letters for numbers 10 and higher, dependend on radix
+    // Allow letters for numbers 10 and higher, dependent on radix
     int normalized = ch;
     if (ch >= 'a' && ch <= 'z') normalized = '0'+10+(ch-'a');
     else if (ch >= 'A' && ch <= 'Z') normalized = '0'+10+(ch-'A');
@@ -281,15 +273,17 @@ int parse_int(FILE * infile, int ch, int * result, int radix) {
 char * escapes = "nrtfe";
 char * ctrlchars = "\n\r\t\f\e";
 
+// We compile toplevel code directly to memory as one big main function,
+// which starts after the primitive references.
+// Notice this presently still misses a proper skip_code header,
+// like we have for blocks (but primitive references are differentiated with a zero).
 void parse(FILE * infile, bool repl) {
     bool interactive = isatty(fileno(infile));
 
     Stack countstack = { 256, 0, malloc(256) };
     Stack skipstack = {256, 0, malloc(256) };
 
-    uint8_t * code = memory; //&memory[CODE_START];
-    main_start = code_end;
-    int pc = code_end;
+    int pc = mem[TOP_OF+CODE];
     char buffer[256];
 
     if(interactive)
@@ -315,7 +309,7 @@ void parse(FILE * infile, bool repl) {
             }
             int result = 0;
             ch = parse_int(infile, ch, &result, radix);
-            code_end = add_command(CMD_PUSH, result, code, code_end);
+            add_command(CMD_PUSH, result);
             count(&countstack, 1);
 //            continue;
             if (!is_whitespace_char(ch) || (countstack.length == 1 && ch == '\n')) continue; // so that superfluous 'ch' is processed in next round
@@ -340,25 +334,25 @@ void parse(FILE * infile, bool repl) {
                 ch = fgetc(infile);
             }
             buffer[i++] = 0;
-            code_end = add_command(CMD_PUSH, unique_string(buffer), code, code_end);
+            add_command(CMD_PUSH, unique_string(buffer));
             count(&countstack, 1);
         } else if (ch == '{') {
             bopen(&countstack);
             bopen(&skipstack);
-            count(&skipstack, code_end); // TODO make this always relative to last opening accolade, to make nesting work
-            code_end = add_command(CMD_SKIP, 0xFFFF, code, code_end); // Force creation of word-sized value, to be overwritten later
+            count(&skipstack, mem[TOP_OF+CODE]); // TODO make this always relative to last opening accolade, to make nesting work
+            add_command(CMD_SKIP, 0xFFFF); // Force creation of word-sized value, to be overwritten later
         } else if (ch == '}' || ch == ';') {
             uint16_t num_args = bclose(&countstack);
             // Assuming we want 'separator-separated' commands inside {},
             // and assuming there is an expression without an end separator,
             // finalize that expression:
             if (!(ch == '}' && num_args == 0)) // This prevents a final ';' from clearing the return value by adding EVAL 0
-                code_end = add_command(CMD_EVAL, num_args, code, code_end);
+                add_command(CMD_EVAL, num_args);
 //            if (ch == '}') printf("Num args: %d\n", num_args);
 
             if (ch == '}') {
                 int where = bclose(&skipstack);
-                ((uint16_t *) (&code[where+1]))[0] = code_end - where - 3; // 3 == size of skip instruction itself
+                ((uint16_t *) (&memory[where+1]))[0] = mem[TOP_OF+CODE] - where - 3; // 3 == size of skip instruction itself
                 count(&countstack, 1);
             } else {
                 bopen(&countstack); // add new statement
@@ -372,18 +366,16 @@ void parse(FILE * infile, bool repl) {
             if (num_args > 0) {
                 if (ch != '\n') { count(&countstack, 1); } // count return value from previous expr
                 if (ch == '\n') { bopen(&countstack); } // for bracketless
-                code_end = add_command(CMD_EVAL, num_args, code, code_end);
+                add_command(CMD_EVAL, num_args);
             } else if (ch == ')') printf("Bracket mismatch!\n");
 
             if(countstack.length == 1 && ch == '\n') {
                 // Add command to clear argstack
-                code_end = add_command(CMD_EVAL, 0, code, code_end);
-                //print_asm(&code[main_start], code_end-main_start);
+                add_command(CMD_EVAL, 0);
                 if (repl) {
-                    run_code(&code[pc], code_end-pc, true, infile == stdin);
-                    //uint16_t result = peek(&argstack);
+                    run_code(&memory[pc], mem[TOP_OF+CODE]-pc, true, infile == stdin);
                     if (interactive && argstack.length > 0) printf("[%d] Ok.\n", peek(&argstack));
-                    pc = code_end;
+                    pc = mem[TOP_OF+CODE];
                 }
                 if(interactive) printf("> ");
           }
@@ -394,7 +386,7 @@ void parse(FILE * infile, bool repl) {
             while (ch != EOF && !is_whitespace_char(ch) && !is_bracket_char(ch) && ch != ';') { buffer[i++] = ch; ch = fgetc(infile); }
             buffer[i++] = 0;
             //printf("Label is: '%s'\n", buffer);
-            code_end = add_command(CMD_REF, unique_string(buffer), code, code_end);
+            add_command(CMD_REF, unique_string(buffer));
             count(&countstack, 1);
             if (!is_whitespace_char(ch) || (countstack.length == 1 && ch == '\n')) continue; // so that superfluous 'ch' is processed in next round
         }
@@ -403,13 +395,44 @@ void parse(FILE * infile, bool repl) {
     }
 }
 
+/*
+Most of our current programs fit in 4k of regs (1/8), vars (3/8) and strings (4/8)
+combined with 8k of code, but we can afford to double these sizes:
+
+0000  8k Regs / sprites / vars / strings
+2000 16k Code
+6000  4k Default tiles
+7000  3k Extra tiles (3/4)
+7C00  1k Screen memory (or just start at 8000)
+8000 32k User / sprite map memory
+
+A slightly more code-oriented leayout could be realized for instance as follows:
+
+0000 12k Regs / sprites / vars / strings
+3000 20k Code
+8000 4k Default tiles
+9000 3k Extra tiles (3/4)
+9C00 1k Screen memory (or just start at A000)
+A000 24k User / sprite map memory
+*/
 
 void pasta_init() {
     memory = malloc(MAX_MEM);
-    memory[STRING_START] = 0;
-    memory[VARS_START] = 0;
-    vars_end = VARS_START;
-    code_end = CODE_START;
+    mem = (uint16_t *) memory;
+
+    // Fill our basic memory layout registers
+    mem[REGS] = 0x0000;
+    mem[VARS] = 0x0400;
+    mem[STRINGS] = 0x1000;
+    mem[CODE] = 0x2000;
+    mem[END_OF+CODE] = 0xFFFF; // Use all mem unless a specific machine registers more memory blocks
+
+    // Init segments and their tops
+    memory[mem[VARS]] = 0;
+    memory[mem[STRINGS]] = 0;
+    mem[TOP_OF+VARS] = mem[VARS];
+    mem[TOP_OF+STRINGS] = mem[STRINGS];
+    mem[TOP_OF+CODE] = mem[CODE];
 
     argstack.length = 0;
     argstack.size = 256;

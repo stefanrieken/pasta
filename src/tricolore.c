@@ -18,7 +18,10 @@ GtkWidget * drawing_area;
 #define SCALE 2
 
 // palette register is placed after 16 sprites
-#define PALETTE_MEM 16 * 1024 + 16*16
+#define SPRITE_MEM 0x0200
+#define PALETTE_MEM (SPRITE_MEM + 16*16)
+
+#define TILE_MEM 0x6000
 
 bool screen_active = false;
 
@@ -174,7 +177,7 @@ typedef struct Sprite {
   uint8_t width;
   uint8_t height;
   uint16_t map; // location of map in memory. Must be 16 bit, otherwise granularity is way off
-  uint8_t mode; // 6-bit (MSB) location of tiles (presently offset from 20k = 0x5000) + 2-bit mode
+  uint8_t mode; // 6-bit (MSB) location of tiles (presently offset from 24k = 0x6000) + 2-bit mode
   uint8_t flags; // msb->lsb: scaley (2b) scalex (2b), transparent (4b);
   uint16_t colors; // 4x index into 4-bit color palette
 } Sprite;
@@ -186,12 +189,11 @@ void draw(int from_x, int from_y, int width, int height) {
 
   // May not need to clear screen when redrawing full background / character screen
 
-  int spritemem = 16 * 1024; // just any location
   uint32_t * palette = (uint32_t *) &memory[PALETTE_MEM];
 
   // 16 sprite structs of size 16 = 256 bytes
   for (int s =0; s<16; s++) {
-    Sprite * sprite = (Sprite *) &memory[spritemem + (16 * s)];
+    Sprite * sprite = (Sprite *) &memory[SPRITE_MEM + (16 * s)];
     int transparent = sprite->flags & 0x0F;
     int scalex = ((sprite->flags >> 4) & 0b11)+1; // Can scale 2,3,4 times; maybe rather 2,4,8?
     int scaley = ((sprite->flags >> 6) & 0b11)+1;
@@ -228,7 +230,7 @@ void draw(int from_x, int from_y, int width, int height) {
           // Also need to get to the right line of this tile for the current pixel; add (i%8) * 16 bytes per line
           // Then we need to pick out the right byte depending on the current bit written:
           uint8_t byte_idx = ((j/scalex) % 8) < 4 ? 0 : 1;
-          uint8_t tile_data = memory[(20+(sprite->mode & 0b11111100))*1024 + (tile_idx/8)*128+((i/scaley)%8)*16 + ((tile_idx%8))*2 + byte_idx];
+          uint8_t tile_data = memory[TILE_MEM + (sprite->mode & 0b11111100)*1024 + (tile_idx/8)*128+((i/scaley)%8)*16 + ((tile_idx%8))*2 + byte_idx];
 
 
           int pxdata = (tile_data >> ((3-((j/scalex)%4))*2)) & 0b11;
@@ -339,8 +341,8 @@ int main (int argc, char ** argv) {
     register_display_prims();
 
     // Fill ascii
-    quickread_2bitmap("assets/ascii1.bmp", &memory[0x5000], (uint32_t *) &memory[PALETTE_MEM]);
-    quickread_2bitmap("assets/ascii2.bmp", &memory[0x5400], (uint32_t *) &memory[PALETTE_MEM]);
+    quickread_2bitmap("assets/ascii1.bmp", &memory[TILE_MEM], (uint32_t *) &memory[PALETTE_MEM]);
+    quickread_2bitmap("assets/ascii2.bmp", &memory[TILE_MEM+0x0400], (uint32_t *) &memory[PALETTE_MEM]);
 
     display_init(argc, argv);
 

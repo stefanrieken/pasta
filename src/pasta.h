@@ -34,25 +34,25 @@ typedef uint16_t (*PrimGroupCb)(uint8_t prim);
 uint8_t add_primitive_group(PrimGroupCb cb);
 uint16_t add_primitive(uint16_t prim);
 
-//
-// memory layout
-//
+// The array containing all of the system's memory
 extern uint8_t * memory;
+// A 16-bit view on the same array, mainly used to access the memory layout registers
+
+// The name of the (subset of) memory layout registers administered by Pasta
+extern uint16_t * mem;
+enum {
+    REGS,
+    VARS,
+    STRINGS,
+    CODE
+    // Memory layout registry is (for now) 8 words wide, so 4 more values may be added by specific machines
+};
+// So we can write e.g. mem[END_OF+VARS] to reinterpret the next registry item as an end indicator
+#define END_OF 1
+// so we can write e.g. mem[TOP_OF+VARS] to access the top-of-memory registers
+#define TOP_OF 8
 
 #define MAX_MEM (64 * 1024)
-
-#define CODE_START 0x0400
-
-#define STRING_START 0x2400
-#define MAX_CODE (STRING_START - CODE_START)
-extern int code_end;
-extern int main_start;
-
-#define VARS_START 0x3000
-#define MAX_STRING (VARS_START - STRING_START)
-
-#define MAX_VARS (MAX_MEM - VARS_START)
-extern int vars_end;
 
 //
 // Callbacks

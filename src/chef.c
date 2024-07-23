@@ -25,7 +25,7 @@ void write_little_endian(FILE * file, uint16_t num) {
      fputc(num >> 8, file);
 }
 
-uint16_t read_little_endian() {
+uint16_t read_little_endian(FILE * file) {
     uint16_t result = 0;
     result |= fgetc(file);
     result |= (fgetc(file) << 8);
