@@ -193,6 +193,7 @@ void run_func(uint16_t func) {
 void run_code(unsigned char * code, int length, bool toplevel, bool from_stdin) {
     int saved_vars_top = mem[TOP_OF+VARS];
     int saved_argstack = argstack.length;
+    int saved_datastack = mem[TOP_OF+DATA];
 
     for (int i=0; i<length; i++) {
         uint8_t cmd = code[i] & 0b11;
@@ -206,10 +207,11 @@ void run_code(unsigned char * code, int length, bool toplevel, bool from_stdin) 
             case CMD_EVAL:
                 //printf("eval %d\n", value);
                 if(value == 0) { // clear argstack at end of line
-                    // Show expression rsult status if file is stdin,
+                    // Show expression result status if file is stdin,
                     // even if it is piped input
                     if(from_stdin) printf("[%d] Ok.\n", pop(&argstack));
-                    argstack.length = 0;
+                    argstack.length = saved_argstack;
+                    mem[TOP_OF+DATA] = saved_datastack;
                 } else {
                     push(&argstack, value); // push n args
                     run_func(item(&argstack, value+1));
@@ -235,8 +237,10 @@ void run_code(unsigned char * code, int length, bool toplevel, bool from_stdin) 
     if (!toplevel) {
         mem[TOP_OF+VARS] = saved_vars_top;
         int result = pop(&argstack);
+//        if (argstack.length < saved_argstack) { printf ("TODO I suspect underflow when taking args\n"); }
         argstack.length = saved_argstack;
         push(&argstack, result);
+        mem[TOP_OF+DATA] = saved_datastack;
     }
 }
 
@@ -421,7 +425,7 @@ void pasta_init() {
     mem = (uint16_t *) memory;
 
     // Fill our basic memory layout registers
-    mem[REGS] = 0x0000;
+    mem[DATA] = 0x0020;
     mem[VARS] = 0x0400;
     mem[STRINGS] = 0x1000;
     mem[CODE] = 0x2000;
@@ -430,6 +434,8 @@ void pasta_init() {
     // Init segments and their tops
     memory[mem[VARS]] = 0;
     memory[mem[STRINGS]] = 0;
+
+    mem[TOP_OF+DATA] = mem[DATA];
     mem[TOP_OF+VARS] = mem[VARS];
     mem[TOP_OF+STRINGS] = mem[STRINGS];
     mem[TOP_OF+CODE] = mem[CODE];
@@ -437,10 +443,6 @@ void pasta_init() {
     argstack.length = 0;
     argstack.size = 256;
     argstack.values = malloc(256);
-
-    add_variable("false", 0);
-    add_variable("true", 1);
-    unique_string("+"); // test (de)duplication of strings
 
     register_base_prims();
     register_int_prims();
@@ -451,8 +453,15 @@ void * mainloop(void * arg) {
     char ** args = (char **) arg;
 
     int i = 0;
+    // Load Pasta lib
+    FILE * infile;
+    if ((infile = fopen("recipes/lib.pasta", "r"))) {
+        parse(infile, true);
+        fclose(infile);
+    }
+
     while (args[i] != NULL && strcmp(args[i], "-") != 0) {
-        FILE * infile = fopen(args[i++], "r");
+        infile = fopen(args[i++], "r");
         parse(infile, true);
         fclose(infile);
     }

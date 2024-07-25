@@ -4,6 +4,6 @@ enum "x" "y" "width" "height"
 
 setallb mystruct 5 6 7 8
 
-prints "x, y: "; print (getb mystruct x) (getb mystruct y)
-prints "w, h: "; print (getb mystruct width) (getb mystruct height)
+print "x, y: " ($ (getb mystruct x)) ($ (getb mystruct y))
+print "w, h: " ($ (getb mystruct width)) ($ (getb mystruct height))
 

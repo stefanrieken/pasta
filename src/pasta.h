@@ -41,7 +41,7 @@ extern uint8_t * memory;
 // The name of the (subset of) memory layout registers administered by Pasta
 extern uint16_t * mem;
 enum {
-    REGS,
+    DATA,
     VARS,
     STRINGS,
     CODE

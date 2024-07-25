@@ -93,7 +93,6 @@ loop {
             define "mask" (<< 0b11 (- 6 bits));
             define "value"  (<< color_idx (- 6 bits));
 
-            #prints "painting"; print byte;
             setb tilemem (* (getb sheet) 16) byte (| (& (getb tilemem (* (getb sheet) 16) byte) (~ mask)) value);
 
             draw (+ (* x 3) 64) (* y 3) 3 3;  # redraw affected area only

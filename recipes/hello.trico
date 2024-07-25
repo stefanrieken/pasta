@@ -62,7 +62,6 @@ define "catwalk" {
             if (& direction 0b10) {
                 add "diffy" 1 # Down
             } {
-                # print diffy;
                 if (&& (= diffy 0) (||
                     (pxtouches    (getb sprite1 xpos)    (+ (getb sprite1 ypos) 8))
                     (pxtouches (+ (getb sprite1 xpos) 7) (+ (getb sprite1 ypos) 8))

@@ -2,7 +2,7 @@
 
 define "hello" {
     args "name";
-    prints "Hello, " name "!\n"
+    print "Hello, " name "!\n"
 }
 
 hello "world"

@@ -2,32 +2,32 @@
 # and it works surprisingly well: the block argument is repeated until it
 # returns a false value (0).
 
-
-# This acts like a 'do ... while' loop:
+print "\nSimple do ... while style loop:\n"
 
 define "i" 1;
 loop {
-    print i;
+    print ($ i) " ";
     set "i" (+ 1 i);
     <= i 10
 }
 
-# This takes in a second block, to act like a 'while' loop:
+print "\n\nTwo-block while style loop:\n"
 
 set "i" 1;
 loop {<= i 10} {
-    print i;
+    print ($ i) " ";
     set "i" (+ i 1)
 }
 
-# This does the same, without requiring the double block syntax:
+print "\n\nNested 'if'-based loop (saves repeating next-item statements):\n"
 
-set "i" 1;
+set "i" 0;
 loop {
+    set "i" (+ i 1);
     if (<= i 10) {
-        print i;
-        set "i" (+ i 1);
+        print ($ i) " ";
         return true
     }
 }
+print "\n"
 

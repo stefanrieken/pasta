@@ -2,29 +2,49 @@
 # every 512 byte block whether or not part of it is in use,
 # showing all of memory in a 16*8 ascii art 'square'.
 
-prints "\nMemory usage in (64x8=) 512b blocks:\n\n";
+# Enum into the registry at the start of mem
+enum "regs" "_" "vars" "_" "strings" "_" "code" "_" "code_end";
+# Start of 'top_of' register
+define "top_of" 16;
+
+print "Memory layout:\n"
+print "Data    : " ($ (getw regs) 16 4) "\n";
+print "Vars    : " ($ (getw vars) 16 4) "\n";
+print "Strings : " ($ (getw strings) 16 4) "\n";
+print "Code    : " ($ (getw code) 16 4) "\n";
+print "Code end: " ($ (getw code_end) 16 4) "\n";
+
+print "\nTop of current use:\n"
+print "Data    : " ($ (getw top_of regs) 16 4) "\n";;
+print "Vars    : " ($ (getw top_of vars) 16 4) "\n";;
+print "Strings : " ($ (getw top_of strings) 16 4) "\n";;
+print "Code    : " ($ (getw top_of code) 16 4) "\n";;
+
+print "\nMemory usage in (64x8=) 512b blocks:\n\n";
+
 define "i" 0;
 define "used" false;
 
 loop {
+    if (= 0 (% i 0x1000)) {
+        print ($ i 16 4) "  "
+    };
+
     set "used" (| used (!(= 0 (getb i))));
 
     if (= 63 (% i 64)) {
-        # print i;
         if used {
-            prints "#"
+            print "#"
         } {
-            prints "."
+            print "."
         };
 
         set "used" false;
         
         if (= 0x1FF (% i 0x200)) {
-            prints " ";
+            print " ";
             if (= 0x0FFF (% i 0x1000)) {
-                if (< i 0x1000) { prints "0" };
-                printx i;
-                # prints "\n"
+                print " " ($ i 16 4) "\n"
             }
         };
     };

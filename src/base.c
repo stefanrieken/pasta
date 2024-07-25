@@ -5,11 +5,10 @@
 
 // Base primitive defs
 enum {
-    PRIM_HELLO,
     PRIM_RETURN,
     PRIM_PRINT,
-    PRIM_PRINTX,
-    PRIM_PRINTS,
+    PRIM_$,
+    PRIM_C,
     PRIM_LS,
     PRIM_STRINGS,
     PRIM_CODE,
@@ -26,12 +25,44 @@ enum {
     PRIM_NOT,
     PRIM_NOTB,
     PRIM_GET_BYTE,
+    PRIM_GET_WORD,
     PRIM_SET_BYTE,
+    PRIM_SET_WORD,
     PRIM_SET_ALL_BYTE,
     PRIM_LSB,
-    PRIM_MSB
+    PRIM_MSB,
+    PRIM_READ,
+    PRIM_GETC
 };
 
+// Convert an integer value to a base-n string representation 
+// (for printing), stored on the temporal data stack.
+uint16_t val_to_base(uint16_t val, uint16_t base, uint16_t positions) {
+    // Return the position of the new value
+    uint16_t result = mem[TOP_OF+DATA];
+
+    if (positions == 0) {
+        // Decide positions based on val
+        uint16_t val2 = val;
+        while (val2 != 0) { val2 = val2 / base; positions++; }
+        if (positions == 0) positions = 1;
+    }
+
+    int divider = 1;
+    while (positions > 1) { divider *= base; positions--; }
+
+    while (divider != 0) {
+        uint8_t digit = (val / divider) % base;
+        uint8_t start = digit < 10 ? '0' : 'a' - 10;
+        memory[mem[TOP_OF+DATA]++] = start + ((val / divider) % base);
+        divider /= base;
+    }
+
+    memory[mem[TOP_OF+DATA]++] = '\0';
+    return result;
+}
+
+FILE * readfile = NULL;
 uint16_t base_prim_group_cb(uint8_t prim) {
     uint16_t n = peek(&argstack);
     uint16_t temp, func, func2;
@@ -39,31 +70,26 @@ uint16_t base_prim_group_cb(uint8_t prim) {
     Variable * var;
 
     switch(prim) {
-        case PRIM_HELLO:
-            // This is where you typically land when you make a wild reference
-            // and the zeroes in memory suggest the first primitive function.
-            printf("Hello from primitive #%d\n", prim);
-            result = 0;
-            break;
         case PRIM_RETURN:
             // May also call this 'pass', 'quote', 'ref', etc.
             // The point is to turn a lone value into an expression
-            // instead of accidentally evaluating it
+            // instead of accidentally evaluating it as a function
             result = item(&argstack, n--);
             break;
         case PRIM_PRINT:
-            while(n != 1) { temp = item(&argstack, n--); printf("%d ", temp); }
-            printf("\n");
-            result = temp;
-            break;
-        case PRIM_PRINTX:
-            while(n != 1) { temp = item(&argstack, n--); printf("%X ", temp); }
-            printf("\n");
-            result = temp;
-            break;
-        case PRIM_PRINTS:
             while(n != 1) { temp = item(&argstack, n--); printf("%s", (char *) &memory[temp]); }
             result = temp;
+            break;
+        case PRIM_$:
+            temp = item(&argstack, n--);
+            uint16_t base = n > 1 ? item(&argstack, n--) : 10;
+            uint16_t positions = n > 1 ? item(&argstack, n--) : 0;
+            result = val_to_base(temp, base, positions);
+            break;
+        case PRIM_C:
+            result = mem[TOP_OF+DATA];
+            memory[mem[TOP_OF+DATA]++] = item(&argstack, n--);
+            memory[mem[TOP_OF+DATA]++] = '\0';
             break;
         case PRIM_LS:
             ls();
@@ -164,18 +190,22 @@ uint16_t base_prim_group_cb(uint8_t prim) {
             result = result ? 0 : 1;
             break;
         case PRIM_NOTB:
-            result = ~item(&argstack, n--); // TODO consider limiting to 8 bits
+            result = ~item(&argstack, n--); // Note that the resultl is 16-bit
             break;
         case PRIM_GET_BYTE:
+        case PRIM_GET_WORD:
             temp = item(&argstack, n--);
-            while (n > 1) temp += item(&argstack, n--); // Allow struct indexing: get mystruct myenum
+            while (n > 1) temp += item(&argstack, n--); // Allow struct indexing: getb mystruct myenum
             result = memory[temp];
+            if (prim == PRIM_GET_WORD) result |= memory[temp+1] << 8;
             break;
         case PRIM_SET_BYTE:
+        case PRIM_SET_WORD:
             temp = item(&argstack, n--);
-            while (n > 2) temp += item(&argstack, n--); // Allow struct indexing: get mystruct myenum
+            while (n > 2) temp += item(&argstack, n--); // Allow struct indexing: setb mystruct myenum
             result = item(&argstack, n--);
-            memory[temp] = result;
+            memory[temp] = result & 0xFF;
+            if (prim == PRIM_SET_WORD) memory[temp+1] = result >> 8;
             break;
         case PRIM_SET_ALL_BYTE:
             temp = item(&argstack, n--);
@@ -193,6 +223,22 @@ uint16_t base_prim_group_cb(uint8_t prim) {
             temp = item(&argstack, n--);
             result = temp & 0xFF;
             break;
+        case PRIM_READ: // Open a file for reading in callback
+            if (n != 3) { printf("Wrong num of args to read\n"); break; }
+            temp = item(&argstack, n--);
+            func = item(&argstack, n--);
+            if((readfile = fopen((const char*) &memory[temp], "r"))) {
+                push(&argstack, 1); // No real file handle yet, but some differentiator from stdin 
+                push(&argstack, 1); // 1 arg
+                run_func(func);
+                result = pop(&argstack);
+                fclose(readfile);
+            } else printf ("bah he\n");
+            break;
+        case PRIM_GETC:
+            temp = n > 1 ? item(&argstack, n--) : 0;
+            result = fgetc(temp == 1 ? readfile : stdin);
+            break;
         default:
             // It is very easy to come here by triggering the
             // evaluation of a random value as a function.
@@ -209,11 +255,10 @@ uint16_t base_prim_group_cb(uint8_t prim) {
 void register_base_prims() {
     uint8_t group = add_primitive_group(base_prim_group_cb);
 
-    add_variable("hi", add_primitive(group | PRIM_HELLO));
     add_variable("return", add_primitive(group | PRIM_RETURN));
     add_variable("print", add_primitive(group | PRIM_PRINT));
-    add_variable("printx", add_primitive(group | PRIM_PRINTX));
-    add_variable("prints", add_primitive(group | PRIM_PRINTS));
+    add_variable("$", add_primitive(group | PRIM_$));
+    add_variable("c", add_primitive(group | PRIM_C));
     add_variable("ls", add_primitive(group | PRIM_LS));
     add_variable("strings", add_primitive(group | PRIM_STRINGS));
     add_variable("code", add_primitive(group | PRIM_CODE));
@@ -230,8 +275,12 @@ void register_base_prims() {
     add_variable("!", add_primitive(group | PRIM_NOT));
     add_variable("~", add_primitive(group | PRIM_NOTB));
     add_variable("getb", add_primitive(group | PRIM_GET_BYTE));
+    add_variable("getw", add_primitive(group | PRIM_GET_WORD));
     add_variable("setb", add_primitive(group | PRIM_SET_BYTE));
+    add_variable("setw", add_primitive(group | PRIM_SET_WORD));
     add_variable("setallb", add_primitive(group | PRIM_SET_ALL_BYTE));
     add_variable("lsb", add_primitive(group | PRIM_LSB));
     add_variable("msb", add_primitive(group | PRIM_MSB));
+    add_variable("read", add_primitive(group | PRIM_READ));
+    add_variable("getc", add_primitive(group | PRIM_GETC));
 }

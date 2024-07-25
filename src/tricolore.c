@@ -346,8 +346,12 @@ int main (int argc, char ** argv) {
 
     display_init(argc, argv);
 
-    // Load Tricolore lib
+    // Load Pasta + Tricolore libs
     FILE * infile;
+    if ((infile = fopen("recipes/lib.pasta", "r"))) {
+        parse(infile, true);
+        fclose(infile);
+    }
     if ((infile = fopen("recipes/lib.trico", "r"))) {
         parse(infile, true);
         fclose(infile);

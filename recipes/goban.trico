@@ -135,13 +135,13 @@ define "play" {
     floodfill opposite (- (getb liberties (point (+ x 1) y)) 1) (+ x 1) y true;
 
     define "newval" 0;
-    add "newval" (added_value color x (- y 1)); # prints "top   : "; print newval;
-    add "newval" (added_value color (- x 1) y); # prints "left  : "; print newval;
-    add "newval" (added_value color x (+ y 1)); # prints "bottom: "; print newval;
-    add "newval" (added_value color (+ x 1) y); # prints "right : "; print newval;
+    add "newval" (added_value color x (- y 1)); # print "top   : " ($ newval);
+    add "newval" (added_value color (- x 1) y); # print "left  : " ($ newval);
+    add "newval" (added_value color x (+ y 1)); # print "bottom: " ($ newval);
+    add "newval" (added_value color (+ x 1) y); # print "right : " ($ newval);
 
-    # prints (if (= color 0x13) { return "b " } { return "w " });
-    # print x y newval;
+    # print (if (= color 0x13) { return "b " } { return "w " });
+    # print ($ x) ($ y) ($ newval);
 
     setb stones (point x y) color;
     setb move_tile opposite;

@@ -37,10 +37,10 @@ loop {
 read_chunkf "test.chef" {
     args "version" "machineType" "fileType" "details";
 
-    prints "Version  : "; print version;
-    prints "Machine  : "; print machineType;
-    prints "File type: "; print fileType;
-    prints "Details  : "; print details;
+    print "Version  : " ($ version);
+    print "Machine  : " ($ machineType);
+    print "File type: " ($ fileType);
+    print "Details  : " ($ details);
     return true
 } {
     args "machineType" "chunkType" "version" "addressing";

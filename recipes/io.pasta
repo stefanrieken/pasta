@@ -1,0 +1,16 @@
+# This program prints itself.
+
+read "recipes/io.pasta" {
+    args "file";
+
+    define "ch" 0;
+
+    loop {
+        set "ch" (getc file);
+
+        if (! (= ch 0xFFFF)) {
+            print (c ch);
+            return true
+        }
+    }
+}
