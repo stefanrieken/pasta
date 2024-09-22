@@ -275,7 +275,7 @@ uint16_t disp_prim_group_cb(uint8_t prim) {
               str = item(&argstack, n--);
               while(memory[str] != 0) {
                 if(memory[str] == '\n') {
-                  temp = (temp / SCREEN_WIDTH) * SCREEN_WIDTH + (SCREEN_WIDTH); // set cursor to new line (TODO does not compute end of screen!)
+                  temp = (temp / SCREEN_WIDTH) * SCREEN_WIDTH + SCREEN_WIDTH; // set cursor to new line (TODO does not compute end of screen!)
                 } else if (memory[str] == 0x0f) { // 'shift out': used for inverse (may also be used to end reverse)
                   inverse ^= 0b10000000;
                 } else if (memory[str] == 0x10) { // 'shift in': used to end reverse

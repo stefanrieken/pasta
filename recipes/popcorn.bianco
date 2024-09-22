@@ -1,0 +1,73 @@
+#
+# This program is intended to run on Pasta Bianco on the Thumby
+#
+# To build Pasta Bianco, type 'make rp2040'.
+# (Assumption: the Pico SDK is located alongside the Pasta project.)
+# 
+# 
+write "Popcorn!"
+
+define "true" 1;
+define "false" 0;
+
+define "notes" 0x6000
+
+# Describe a pretty low octave to stay in byte range
+# These are mostly calculated as just ratios relative to A=440
+#             0   1   2   3   4   5   6   7   8   9  10  11  12 
+#
+#                 C   #   D   #   E   F   #   G   #   A   #   B
+setallb notes 0   66  69  73  77  83  88  92  97 103 110 117 124
+define "melody" 0x6010
+define "octave" 0x6080
+define "rhythm" 0x60A0
+
+setallb melody  10  8 10  5  1  5 10  0   10  8 10  5  1  5 10  0   10 12  1  1  1 10 12 12 12  8 10 10 10  6 10  0  0xFF
+setallb octave   8  8  8  8  8  8  4  0    8  8  8  8  8  8  4  0    8  8 16 16 16  8  8  8  8  8  8  8  8  8  8  8  0
+setallb rhythm   2  2  2  2  2  2  2  2    2  2  2  2  1  2  2  3    2  2  2  2  2  2  2  2  2  2  2  2  2  2  2  2  2
+
+
+define "play" {
+    args "up";
+
+    define "i" 0;
+    define "from" 0;
+    define "note" 0;
+    define "oct" 0;
+    define "speed" 75;
+
+    loop {
+        set "note" (getb melody i);
+        set "oct"  (getb octave i);
+
+        if (! (= note 0xFF)) {
+            if (! (= note 0)) {
+                add "note" up;
+                loop {
+                    if (> note 12) {
+                        set "note" (- note 12);
+                        set "oct" (* oct 2);
+                        return true;
+                    };
+                }
+            };
+
+            beep (* (getb notes note) oct) (* (getb rhythm i) 75);
+            add "i" 1;
+            return true;
+        };
+    };
+}
+
+define "i" 0;
+loop {
+    play  0;  play 0;
+    play  3;  play 3;
+    play  9;  play 9;
+    play 12; play 12;
+    add "i" 1;
+    < i 2;
+}    
+
+print "done\n"
+

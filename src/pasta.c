@@ -10,14 +10,34 @@
 #include "base.h"
 #include "int.h"
 #include "chef.h"
+#ifdef PICO_SDK
+#include "thumby.h"
+#endif
 
 uint8_t * memory;
+
+// Note: Pico SDK hangs on unaligned access; so be weary of casts to (uint16_t *)
+// In theory 'mem' should be 16-bit aligned as long as 'memory' is.
+// Of course, accessing data using 'mem' implicitly yields system alignment.
+// which in practice will be little endian for most machines.
 uint16_t * mem;
 
 
 uint8_t prim_group_len;
 #define MAX_PRIM_GROUPS 8
 PrimGroupCb prim_groups[MAX_PRIM_GROUPS];
+
+#ifdef PICO_SDK
+
+int getch(FILE * file) {
+    int ch = fgetc(file);
+    if (ch == '\r') ch = '\n'; // \r is EOL in serial terminal
+    printf("%c", ch);
+    return ch;
+}
+#else
+#define getch fgetc
+#endif
 
 /** 
  * Find string in unique string list, or add it.
@@ -30,7 +50,7 @@ uint16_t unique_string(char * string) {
         i += memory[i]; // follow chain
         if(i >= mem[END_OF+STRINGS]) { printf("String overflow!\n"); return 0; }
     }
-    // printf("Adding new string '%s' at pos %d\n", string, i);
+    //printf("Adding new string '%s' at pos %d\n", string, i);
 
     int len = strlen(string) + 1; // include 0 at end
     memory[i] = len+1; // = skip count
@@ -39,7 +59,10 @@ uint16_t unique_string(char * string) {
     strcpy((char *) (&memory[result]), string);
     memory[i+len+1] = 0; // mark end of chain
 
-    mem[TOP_OF+STRINGS] = i+len+1; // Update top register even if we don't actively read it
+    // Update top register even if we don't actively read it
+    // Little endian
+    memory[TOP_OF+STRINGS] = (i+len+1) & 0xFF;
+    memory[TOP_OF+STRINGS] = ((i+len+1) >> 8) & 0xFF;
 
     return result;
 }
@@ -128,8 +151,8 @@ bool is_whitespace_char(int ch) {
     return ch == ' ' || ch == '\t' || ch == '\r' || ch == '\n';
 }
 int next_non_whitespace_char(FILE * infile, int until) {
-    int ch = fgetc(infile);
-    while (ch != EOF && ch != until && is_whitespace_char(ch)) ch = fgetc(infile);
+    int ch = getch(infile);
+    while (ch != EOF && ch != until && is_whitespace_char(ch)) ch = getch(infile);
     return ch;
 }
 
@@ -158,8 +181,8 @@ void print_asm(unsigned char * code, int code_end) {
         int value = code[i] >> 2;
         char mode = 's';
         if(value == WORD_FOLLOWS) {
-            value = ((uint16_t *) (&code[i+1]))[0];
-            i += 2;
+            value = code[i++];
+            value |= code[i++] << 8;
             mode = 'w';
         }
         printf("%s %c %d\n", cmds[cmd], mode, value);
@@ -180,7 +203,8 @@ void run_func(uint16_t func) {
         result = prim_groups[group](prim & 0b11111);
     } else {
         // 'type' is actually a skip_code instruction
-        uint16_t length = ((uint16_t *) (&memory[func+1]))[0];
+        uint16_t length = memory[func+1];
+        length |= memory[func+2] << 8;
         run_code(&memory[func+3], length, false, false);
         result = pop(&argstack);
         // assume for now all args are taken
@@ -197,9 +221,10 @@ void run_code(unsigned char * code, int length, bool toplevel, bool from_stdin) 
 
     for (int i=0; i<length; i++) {
         uint8_t cmd = code[i] & 0b11;
-        int value = code[i] >> 2;
+        uint16_t value = code[i] >> 2;
         if (value == WORD_FOLLOWS) {
-            value = ((uint16_t *) (&code[i+1]))[0];
+            value = code[i+1];
+            value |= (code[i+2] << 8);
             i+=2;
         }
 
@@ -249,9 +274,9 @@ void add_command(unsigned char cmd, uint16_t value) {
         // Can't encode within 2^6 - 4
         // encode as 'word follows' (for now always 16-bit)
         memory[mem[TOP_OF+CODE]++] = cmd | (WORD_FOLLOWS << 2);
-        // Just piggybacking on system endianness here
-        ((uint16_t *) (&memory[mem[TOP_OF+CODE]]))[0] = value;
-        mem[TOP_OF+CODE]+= 2;
+        // Little endian
+        memory[mem[TOP_OF+CODE]++] = value & 0xFF;
+        memory[mem[TOP_OF+CODE]++] = (value >> 8) & 0xFF;
     } else {
         memory[mem[TOP_OF+CODE]++] = cmd | (value << 2);
     }
@@ -265,7 +290,7 @@ int parse_int(FILE * infile, int ch, int * result, int radix) {
     else if (ch >= 'A' && ch <= 'Z') normalized = '0'+10+(ch-'A');
     while(normalized >= '0' && normalized <= '0'+radix) {
         *result = (*result * radix) + (normalized-'0');
-        ch = fgetc(infile);
+        ch = getch(infile);
         normalized = ch;
         if (ch >= 'a' && ch <= 'z') normalized = '0'+10+(ch-'a');
         else if (ch >= 'A' && ch <= 'Z') normalized = '0'+10+(ch-'A');
@@ -300,16 +325,15 @@ void parse(FILE * infile, bool repl) {
     while (ch != EOF) {
         if (ch == '#') {
             // skip comments
-            do { ch = fgetc(infile); } while (ch != '\n');
-            //ch = next_non_whitespace_char(infile, '\n');
+            do { ch = getch(infile); } while (ch != '\n');
         }
 
         if (ch >='0' && ch <= '9') {
             int radix = 10;
             if (ch == '0') {
-                ch = fgetc(infile);
-                if(ch == 'b') { radix = 2; ch = fgetc(infile); }
-                else if(ch == 'x') { radix = 16; ch = fgetc(infile); }
+                ch = getch(infile);
+                if(ch == 'b') { radix = 2; ch = getch(infile); }
+                else if(ch == 'x') { radix = 16; ch = getch(infile); }
             }
             int result = 0;
             ch = parse_int(infile, ch, &result, radix);
@@ -319,13 +343,13 @@ void parse(FILE * infile, bool repl) {
             if (!is_whitespace_char(ch) || (countstack.length == 1 && ch == '\n')) continue; // so that superfluous 'ch' is processed in next round
         } else if (ch=='\"') {
             int i = 0;
-            ch = fgetc(infile);
+            ch = getch(infile);
             while (ch != '\"') {
                 if (ch == '\\') {
-                    ch = fgetc(infile);
+                    ch = getch(infile);
                     if (ch == 'x') {
                         int result = 0;
-                        ch = parse_int(infile, fgetc(infile), &result, 16);
+                        ch = parse_int(infile, getch(infile), &result, 16);
                         buffer[i++] = result;
                         continue;
                     }
@@ -335,7 +359,7 @@ void parse(FILE * infile, bool repl) {
                     }
                 }
                 buffer[i++] = ch;
-                ch = fgetc(infile);
+                ch = getch(infile);
             }
             buffer[i++] = 0;
             add_command(CMD_PUSH, unique_string(buffer));
@@ -356,7 +380,11 @@ void parse(FILE * infile, bool repl) {
 
             if (ch == '}') {
                 int where = bclose(&skipstack);
-                ((uint16_t *) (&memory[where+1]))[0] = mem[TOP_OF+CODE] - where - 3; // 3 == size of skip instruction itself
+                int relative = mem[TOP_OF+CODE] - where - 3;
+
+                // Little endian
+                memory[where+1] = relative & 0xFF;
+                memory[where+2] = (relative >> 8) & 0xFF;
                 count(&countstack, 1);
             } else {
                 bopen(&countstack); // add new statement
@@ -387,12 +415,12 @@ void parse(FILE * infile, bool repl) {
         } else if (!is_whitespace_char(ch)) {
             // printf("Label\n");
             int i=0;
-            while (ch != EOF && !is_whitespace_char(ch) && !is_bracket_char(ch) && ch != ';') { buffer[i++] = ch; ch = fgetc(infile); }
+            while (ch != EOF && !is_whitespace_char(ch) && !is_bracket_char(ch) && ch != ';') { buffer[i++] = ch; ch = getch(infile); }
             buffer[i++] = 0;
             //printf("Label is: '%s'\n", buffer);
             add_command(CMD_REF, unique_string(buffer));
             count(&countstack, 1);
-            if (!is_whitespace_char(ch) || (countstack.length == 1 && ch == '\n')) continue; // so that superfluous 'ch' is processed in next round
+            if (!is_whitespace_char(ch) || (countstack.length == 1 && ch =='\n')) continue; // so that superfluous 'ch' is processed in next round
         }
 
         ch = next_non_whitespace_char(infile, '\n');
@@ -421,7 +449,7 @@ A000 24k User / sprite map memory
 */
 
 void pasta_init() {
-    memory = malloc(MAX_MEM);
+    memory = calloc(MAX_MEM / 2, 2); // ask for 16-bit aligned
     mem = (uint16_t *) memory;
 
     // Fill our basic memory layout registers
@@ -444,9 +472,13 @@ void pasta_init() {
     argstack.size = 256;
     argstack.values = malloc(256);
 
+    prim_group_len = 0;
     register_base_prims();
     register_int_prims();
     register_chef_prims();
+#ifdef PICO_SDK
+    register_thumby_prims();
+#endif
 }
 
 void * mainloop(void * arg) {
@@ -474,7 +506,6 @@ void * mainloop(void * arg) {
         }
         parse(stdin, true);
     }
-
     return NULL;
 }
 
