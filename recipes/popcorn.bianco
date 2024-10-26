@@ -22,9 +22,9 @@ define "melody" 0x6010
 define "octave" 0x6080
 define "rhythm" 0x60A0
 
-setallb melody  10  8 10  5  1  5 10  0   10  8 10  5  1  5 10  0   10 12  1  1  1 10 12 12 12  8 10 10 10  6 10  0  0xFF
-setallb octave   8  8  8  8  8  8  4  0    8  8  8  8  8  8  4  0    8  8 16 16 16  8  8  8  8  8  8  8  8  8  8  8  0
-setallb rhythm   2  2  2  2  2  2  2  2    2  2  2  2  1  2  2  3    2  2  2  2  2  2  2  2  2  2  2  2  2  2  2  2  2
+setallb melody  10  8 10  5  1  5 10  0   10  8 10  5  1  5 10  0   10 12  1  1 12  1 10 12 12 12 12  8 10 10 10  6 10  0  0xFF
+setallb octave   8  8  8  8  8  8  4  0    8  8  8  8  8  8  4  0    8  8 16 16  8 16  8  8  8  8  8  8  8  8  8  8  8  8  0
+setallb rhythm   2  2  2  2  2  2  2  2    2  2  2  2  1  2  2  3    2  2  2  2  1  1  2  2  2  1  1  2  2  2  2  2  2  2  2
 
 
 define "play" {
