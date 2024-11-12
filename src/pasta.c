@@ -67,6 +67,21 @@ uint16_t unique_string(char * string) {
     return result;
 }
 
+#ifdef LEXICAL_SCOPING
+
+uint16_t CLOSURE; // Reference to the unique string used for a closure variable
+uint16_t PARENT;  // Reference to the unique string used to point to a closure for the parent scope
+
+// Define closure as an anonymous variable,
+// indicating the position in the variable list at bind time
+uint16_t bind(uint16_t value) {
+    // printf("Binding %d\n", value);
+    Variable * closure = add_var(CLOSURE, value);
+    return ((uint8_t *) closure) - memory;
+}
+#endif
+
+
 void ls() {
     printf("Known variables:");
     int i = mem[VARS];
@@ -101,6 +116,14 @@ Variable * add_variable(char * name, uint16_t value) {
 Variable * lookup_variable(uint16_t name) {
     for (int i=mem[TOP_OF+VARS]-sizeof(Variable);i>=mem[VARS];i-=sizeof(Variable)) {
         Variable * var = (Variable *) &memory[i];
+
+#ifdef LEXICAL_SCOPING
+        if(var->name == PARENT) {
+            i = var->value;
+            continue;
+        }
+#endif
+
         if(var->name == name) return var;
     }
     // Not found
@@ -127,7 +150,6 @@ uint16_t set_var(uint16_t name, uint16_t value) {
     return 0;
 }
 
-
 uint8_t add_primitive_group(PrimGroupCb cb) {
     uint8_t result = prim_group_len << 5;
     prim_groups[prim_group_len++] = cb;
@@ -138,7 +160,11 @@ uint16_t add_primitive(uint16_t prim) {
     //printf("Add prim %d at %d\n", prim, code_end);
     memory[mem[TOP_OF+CODE]++] = 0; // Specify type 'primitive'
     memory[mem[TOP_OF+CODE]++] = prim;
+#ifdef LEXICAL_SCOPING
+    return bind(mem[TOP_OF+CODE]-2);
+#else
     return mem[TOP_OF+CODE]-2;
+#endif
 }
 
 static inline
@@ -190,6 +216,13 @@ void print_asm(unsigned char * code, int code_end) {
 }
 
 void run_func(uint16_t func) {
+
+#ifdef LEXICAL_SCOPING
+    // 'func' actually points to an anonymous closure variable.
+    uint16_t closure = func;
+    func = ((Variable *) &memory[func])->value;
+#endif
+
     // Avoid interpreting zeroes and other random (but hopefully low) functions
     if (func < mem[CODE]) { printf("Invalid function reference.\n"); return; }
     uint8_t type = memory[func];
@@ -202,6 +235,11 @@ void run_func(uint16_t func) {
         // invoke primitive group callback
         result = prim_groups[group](prim & 0b11111);
     } else {
+#ifdef LEXICAL_SCOPING
+        // Start the function 'stack frame' with a variable referencing the closure,
+        // serving as a marker to skip any intermediate variables during lookup.
+        add_var(PARENT, closure);
+#endif
         // 'type' is actually a skip_code instruction
         uint16_t length = memory[func+1];
         length |= memory[func+2] << 8;
@@ -215,7 +253,11 @@ void run_func(uint16_t func) {
 }
 
 void run_code(unsigned char * code, int length, bool toplevel, bool from_stdin) {
+#ifdef LEXICAL_SCOPING
+    int saved_vars_top = mem[TOP_OF+VARS]-sizeof(Variable); // include parent scope ref in actual start of 'frame'
+#else
     int saved_vars_top = mem[TOP_OF+VARS];
+#endif
     int saved_argstack = argstack.length;
     int saved_datastack = mem[TOP_OF+DATA];
 
@@ -252,7 +294,11 @@ void run_code(unsigned char * code, int length, bool toplevel, bool from_stdin) 
                 break;
             case CMD_SKIP:
                 //printf("skip %d\n", value);
+#ifdef LEXICAL_SCOPING
+                push(&argstack, bind((code-memory)+i-2));
+#else
                 push(&argstack, (code-memory)+i-2); // push start address of block
+#endif
                 i += value; // then skip
                 break;
         }
@@ -310,7 +356,7 @@ void parse(FILE * infile, bool repl) {
     bool interactive = isatty(fileno(infile));
 
     Stack countstack = { 256, 0, malloc(256) };
-    Stack skipstack = {256, 0, malloc(256) };
+    Stack skipstack = { 256, 0, malloc(256) };
 
     int pc = mem[TOP_OF+CODE];
     char buffer[256];
@@ -473,6 +519,12 @@ void pasta_init() {
     argstack.values = malloc(256);
 
     prim_group_len = 0;
+
+#ifdef LEXICAL_SCOPING
+    CLOSURE = unique_string("(closure)");
+    PARENT = unique_string("(parent)");
+#endif
+
     register_base_prims();
     register_int_prims();
     register_chef_prims();

@@ -42,7 +42,7 @@ the Pasta folder.
 
 Type 'make rp2040' to make the executables, then copy 'bianco.uf2' to your
 Thumby. Alongside a 'ready' message on the Thumby screen, You should now be
-able to contact your Thumby over serial. From here, press enter to initiate the
+able to contact your Thumby over serial. From there, press enter to initiate
 the Pasta REPL, where you can also copy / paste any relevant samples.
 
 ## Status

@@ -1,4 +1,4 @@
-CFLAGS=-Wall -Wunused -ffunction-sections -fdata-sections
+CFLAGS=-Wall -Wunused -ffunction-sections -fdata-sections -DLEXICAL_SCOPING
 OBJS=src/stack.o src/base.o src/int.o src/pasta.o src/chef.c
 
 %.o: %.c

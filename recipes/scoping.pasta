@@ -1,0 +1,18 @@
+# Shows whether Pasta is compiled with dynamic or lexical scoping,
+# as this determines whether the version of 'x' in the function
+# receiving the block is skipped or not.
+
+# This is the first found value for 'x' in case of lexical scoping.
+define "x" "lexical"
+
+define "foo" {
+    args "bar";
+
+    # This later definition of 'x' is not skipped in case of dynamic scoping.
+    define "x" "dynamic";
+
+    bar
+}
+
+foo { print "This Pasta interpreter is compiled with " x " scoping.\n" }
+
