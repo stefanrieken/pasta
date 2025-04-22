@@ -1,5 +1,6 @@
 #include <stdint.h>
 #include <string.h>
+#include <malloc.h>
 #include "pico/stdlib.h"
 #include "hardware/pwm.h"
 #include "hardware/clocks.h"
@@ -83,6 +84,7 @@ void write_string(char * string, unsigned char * framebuffer, int x, int y) {
   for (int i=0; i<strlen(string);i++) write_char(string[i], framebuffer, x+(i*8), y);
 }
 
+#ifndef PICO_RP2350
 void cls() {
     write_string("         ", &memory[TILE_MEM], 0, 0);
     write_string("         ", &memory[TILE_MEM], 0, 8);
@@ -90,6 +92,7 @@ void cls() {
     write_string("         ", &memory[TILE_MEM], 0, 24);
     display_write_buffer(&memory[TILE_MEM], 72*40 / 8);
 }
+#endif
 
 uint16_t thumby_prim_group_cb(uint8_t prim) {
     uint16_t n = peek(&argstack);
@@ -105,6 +108,7 @@ uint16_t thumby_prim_group_cb(uint8_t prim) {
             if(n > 1) duration  = item(&argstack, n--);
             beep(slice_num, frequency, duration);
             break;
+#ifndef PICO_RP2350
         case PRIM_WRITE:;
             if (n < 2) return 0;
             int str = item(&argstack, n--);
@@ -116,6 +120,7 @@ uint16_t thumby_prim_group_cb(uint8_t prim) {
         case PRIM_CLS:;
             cls();
             break;
+#endif
     }
 }
 
@@ -126,6 +131,15 @@ void register_thumby_prims() {
     gpio_init(AUDIO_ENABLE_PIN);
     gpio_set_dir(AUDIO_ENABLE_PIN, GPIO_OUT);
     gpio_put(AUDIO_ENABLE_PIN, 0);
+
+    engine_display_gc9107_init();
+
+    // write a little demo gradient
+    uint16_t * buffer = malloc(128*128*sizeof(uint16_t));
+    for (int i=0; i<128*128; i++) {
+      buffer[i]=i<<4;
+    }
+    engine_display_gc9107_update(buffer);
 #else
     display_init();
     display_set_brightness(120);
