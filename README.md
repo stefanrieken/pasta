@@ -31,19 +31,19 @@ Tricolore is 80's chic:
 - Each with its own palette of 4 colors (or 3 colors plus transparency) out of a system wide 16-color pallete.
 
 ## For the rp2040 / Thumby
-Plain Pasta should work on the rp2040 once a build target is set up.
+Tricolore should be a sweet match for TinyCircuit's Thumby Color.
 
-Tricolore may be a sweet match for TinyCircuit's Thumby Color, but a port is
-not presently started.
+Pasta **Bianco** was whipped up to serve the original Thumby. It requires a
+copy of the Pico SDK with the TinyUSB submodule to be found next to the Pasta
+folder.
 
-Instead, Pasta **Bianco** was whipped up to serve the original Thumby. It
-requires a copy of the Pico SDK with the TinyUSB submodule to be found next to
-the Pasta folder.
-
-Type 'make rp2040' to make the executables, then copy 'bianco.uf2' to your
+Type `make rp2040` to make the executables, then copy `bianco.uf2` to your
 Thumby. Alongside a 'ready' message on the Thumby screen, You should now be
 able to contact your Thumby over serial. From there, press enter to initiate
 the Pasta REPL, where you can also copy / paste any relevant samples.
+
+An audio-only version of Bianco serves as a first port for the Thumby Color.
+Type `make rp2350` to build this version.
 
 ## Status
 Having had experience with similar recipes, Pasta was cooked up on a whim, but

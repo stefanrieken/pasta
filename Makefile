@@ -17,7 +17,14 @@ rp2040: rp2040/Makefile src/*.c
 
 rp2040/Makefile:
 	mkdir -p rp2040
-	cd rp2040 && cmake ..
+	cd rp2040 && cmake .. -DPICO_PLATFORM=rp2040
+
+rp2350: rp2350/Makefile src/*.c
+	cd rp2350 && make
+
+rp2350/Makefile:
+	mkdir -p rp2350
+	cd rp2350 && cmake .. -DPICO_PLATFORM=rp2350
 
 clean:
 	rm -rf src/*.o pasta tricolore rp2040
