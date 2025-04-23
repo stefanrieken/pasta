@@ -4,9 +4,14 @@
 #include <stdio.h>
 #include <unistd.h>
 
+#ifndef PICO_SDK
+#include <time.h>
+#else
+#include "pico/stdlib.h"
+#endif
+
 #include "pasta.h"
 #include "tricolore.h"
-#include "cairo.h"
 
 #include "bitmap.h"
 
@@ -20,14 +25,17 @@ Variable * pointer_x;
 Variable * pointer_y;
 Variable * click;
 
+#ifndef PICO_SDK
 struct timespec last_time;
 struct timespec this_time;
+#endif
 
 enum {
     PRIM_WRITE,
     PRIM_DRAW,
     PRIM_CATCHUP,
-    PRIM_SAVE_SHEET
+    PRIM_SAVE_SHEET,
+    PRIM_BEEP
 };
 
 uint16_t disp_prim_group_cb(uint8_t prim) {
@@ -71,17 +79,28 @@ uint16_t disp_prim_group_cb(uint8_t prim) {
             // Dividing nsecs by 16 * 1024 * 1024 (== shift 24 bits) yields a refresh rate of ~59.6 Hz
             // The calculation should be cheap on any hardware, if the hardware provision of the nsecs value is so too
             // Of course we can always allow for multiples of this amount (e.g. shift 23 bits) with a similar performance
+#ifndef PICO_SDK
             do {
                 usleep(10000);
                 clock_gettime(CLOCK_REALTIME, &this_time);
             } while(this_time.tv_sec == last_time.tv_sec && (this_time.tv_nsec >> 24) == (last_time.tv_nsec >> 24));
             last_time = this_time;
+#else
+            sleep_us(10000);
+#endif
             result = screen_active;
             break;
         case PRIM_SAVE_SHEET:
             // Utility function specific to the editor
             temp = item(&argstack, n--);
             quickwrite_2bitmap("out.bmp", &memory[temp], (uint32_t *) &memory[item(&argstack, n--)]);
+            break;
+        case PRIM_BEEP:;
+            int frequency = 440;
+            int duration = 500;
+            if(n > 1) frequency = item(&argstack, n--);
+            if(n > 1) duration  = item(&argstack, n--);
+            beep(frequency, duration);
             break;
     }
 
@@ -102,8 +121,11 @@ void register_display_prims() {
     add_variable("draw", add_primitive(group | PRIM_DRAW));
     add_variable("catchup", add_primitive(group | PRIM_CATCHUP));
     add_variable("save_sheet", add_primitive(group | PRIM_SAVE_SHEET));
+    add_variable("beep", add_primitive(group | PRIM_BEEP));
 
+#ifndef PICO_SDK
     clock_gettime(CLOCK_REALTIME, &last_time);
+#endif
 }
 
 void tricolore_init() {
@@ -115,14 +137,77 @@ void tricolore_init() {
 
     // Load Pasta + Tricolore libs
     FILE * infile;
-    if ((infile = fopen("recipes/lib.pasta", "r"))) {
-        parse(infile, true);
-        fclose(infile);
-    }
-    if ((infile = fopen("recipes/lib.trico", "r"))) {
+    if ((infile = open_file("recipes/lib.trico", "rb"))) {
         parse(infile, true);
         fclose(infile);
     }
 
     screen_active = true; // well, almost
+}
+
+// Draw out sprite memory. This is implementation agnostic.
+// Screen implementations must provide:
+// - Their own initialization
+// - The set_pixel callback
+// - The redraw callback
+
+void draw(int from_x, int from_y, int width, int height) {
+  // May not need to clear screen when redrawing full background / character screen
+
+  uint32_t * palette = (uint32_t *) &memory[PALETTE_MEM];
+
+  // 16 sprite structs of size 16 = 256 bytes
+  for (int s =0; s<16; s++) {
+    Sprite * sprite = (Sprite *) &memory[SPRITE_MEM + (16 * s)];
+    int transparent = sprite->flags & 0x0F;
+    int scalex = ((sprite->flags >> 4) & 0b11)+1; // Can scale 2,3,4 times; maybe rather 2,4,8?
+    int scaley = ((sprite->flags >> 6) & 0b11)+1;
+    if (sprite->width != 0 && sprite->height != 0) {
+      int width_map = sprite->width; //(sprite->width + 7) / 8; // Even if width and height are not byte aligned, their map data is
+
+      for (int i=0; i<sprite->height*8*scaley;i++) {
+        if (sprite->y+i < from_y || sprite->y+i >from_y+height) continue; // Some attempt to skip parts that don't need drawing
+
+        // Try to get some (partial) calculations before the next for loop, to avoid repetition
+        int map_idx_h = (i/(8*scaley))*width_map;
+        for (int j=0; j<sprite->width*8*scalex; j++) {
+          if (sprite->x+j < from_x || sprite->x+j >from_x+width) continue; // Some attempt to skip parts that don't need drawing
+
+          // Normal mode: 8-bit tiles
+          uint8_t tile_idx = memory[sprite->map + map_idx_h + j/(8*scalex)];
+          uint8_t colormask = 0;
+
+          switch (sprite->mode & 0b11) {
+              case 1: // Invertible mode: 7-bit tile addressing with 1-bit inverse marker
+                  colormask = (tile_idx & (1 << 7)) ? 0b01 : 0b00; // Only invert the MSB
+                  tile_idx &= 0b01111111;
+                  break;
+              case 2: // Colormask mode: 6-bit tile addressing with 2-bit XOR color mask; this allows for different colorings of the same tiles (within the given 4 colors)
+                  colormask = tile_idx >> 6;
+                  tile_idx &= 0b111111;
+                  break;
+              case 3: // TBD (proposal: sprite struct selection mode, to allow for more than 4 colors in a game map by letting different sprites draw different parts)
+                  break;
+          }
+
+          // Say tile idx = 50; i = 25; j = 30
+          // Tile 50 starts at tiles + (50 / 8 tiles per line) * 16*8 bytes per tile + (50%8)*2 bytes
+          // Also need to get to the right line of this tile for the current pixel; add (i%8) * 16 bytes per line
+          // Then we need to pick out the right byte depending on the current bit written:
+          uint8_t byte_idx = ((j/scalex) % 8) < 4 ? 0 : 1;
+          uint8_t tile_data = memory[TILE_MEM + (sprite->mode & 0b11111100)*1024 + (tile_idx/8)*128+((i/scaley)%8)*16 + ((tile_idx%8))*2 + byte_idx];
+
+
+          int pxdata = (tile_data >> ((3-((j/scalex)%4))*2)) & 0b11;
+
+          if (!(transparent & (1 << pxdata))) {
+              int color = (sprite->colors >> ((pxdata ^ colormask) *4)) & 0b1111;
+              set_pixel(((sprite->x+j)%(8*SCREEN_WIDTH)), ((sprite->y+i)%(8*SCREEN_HEIGHT)), palette[color]); // The $ allows for rotation
+          }
+        }
+      }
+    }
+  }
+
+  redraw(from_x, from_y, width, height);
 }

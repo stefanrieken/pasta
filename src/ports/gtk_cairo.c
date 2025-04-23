@@ -2,14 +2,17 @@
 
 #include <gtk/gtk.h>
 
-#include "pasta.h"
-#include "tricolore.h"
+#include "../pasta.h"
+#include "../tricolore.h"
 
 #define SCALE 2
 
 static cairo_surface_t * surface = NULL;
 static cairo_pattern_t * pattern;
 GtkWidget * drawing_area;
+
+uint8_t * pixels;
+int rowstride;
 
 bool delete_cb(GtkWidget *widget, GdkEventType *event, gpointer userdata) {
   // destroy any global drawing state here,
@@ -134,81 +137,36 @@ void display_init(int argc, char ** argv) {
   g_signal_connect(G_OBJECT(drawing_area), "draw", G_CALLBACK(draw_screen_cb), NULL);
 
   gtk_widget_show_all(GTK_WIDGET(window));
+
+  rowstride = cairo_image_surface_get_stride(surface);
+  pixels = cairo_image_surface_get_data(surface); // probably want to renew this after every commplete draw
 }
 
-// Draw out sprite memory
-void draw(int from_x, int from_y, int width, int height) {
-  uint8_t * pixels = cairo_image_surface_get_data(surface);
-  int rowstride = cairo_image_surface_get_stride(surface);
-
-  // May not need to clear screen when redrawing full background / character screen
-
-  uint32_t * palette = (uint32_t *) &memory[PALETTE_MEM];
-
-  // 16 sprite structs of size 16 = 256 bytes
-  for (int s =0; s<16; s++) {
-    Sprite * sprite = (Sprite *) &memory[SPRITE_MEM + (16 * s)];
-    int transparent = sprite->flags & 0x0F;
-    int scalex = ((sprite->flags >> 4) & 0b11)+1; // Can scale 2,3,4 times; maybe rather 2,4,8?
-    int scaley = ((sprite->flags >> 6) & 0b11)+1;
-    if (sprite->width != 0 && sprite->height != 0) {
-      int width_map = sprite->width; //(sprite->width + 7) / 8; // Even if width and height are not byte aligned, their map data is
-
-      for (int i=0; i<sprite->height*8*scaley;i++) {
-        if (sprite->y+i < from_y || sprite->y+i >from_y+height) continue; // Some attempt to skip parts that don't need drawing
-
-        // Try to get some (partial) calculations before the next for loop, to avoid repetition
-        int map_idx_h = (i/(8*scaley))*width_map;
-        for (int j=0; j<sprite->width*8*scalex; j++) {
-          if (sprite->x+j < from_x || sprite->x+j >from_x+width) continue; // Some attempt to skip parts that don't need drawing
-
-          // Normal mode: 8-bit tiles
-          uint8_t tile_idx = memory[sprite->map + map_idx_h + j/(8*scalex)];
-          uint8_t colormask = 0;
-
-          switch (sprite->mode & 0b11) {
-              case 1: // Invertible mode: 7-bit tile addressing with 1-bit inverse marker
-                  colormask = (tile_idx & (1 << 7)) ? 0b01 : 0b00; // Only invert the MSB
-                  tile_idx &= 0b01111111;
-                  break;
-              case 2: // Colormask mode: 6-bit tile addressing with 2-bit XOR color mask; this allows for different colorings of the same tiles (within the given 4 colors)
-                  colormask = tile_idx >> 6;
-                  tile_idx &= 0b111111;
-                  break;
-              case 3: // TBD (proposal: sprite struct selection mode, to allow for more than 4 colors in a game map by letting different sprites draw different parts)
-                  break;
-          }
-
-          // Say tile idx = 50; i = 25; j = 30
-          // Tile 50 starts at tiles + (50 / 8 tiles per line) * 16*8 bytes per tile + (50%8)*2 bytes
-          // Also need to get to the right line of this tile for the current pixel; add (i%8) * 16 bytes per line
-          // Then we need to pick out the right byte depending on the current bit written:
-          uint8_t byte_idx = ((j/scalex) % 8) < 4 ? 0 : 1;
-          uint8_t tile_data = memory[TILE_MEM + (sprite->mode & 0b11111100)*1024 + (tile_idx/8)*128+((i/scaley)%8)*16 + ((tile_idx%8))*2 + byte_idx];
-
-
-          int pxdata = (tile_data >> ((3-((j/scalex)%4))*2)) & 0b11;
-
-          int pixel_idx = (((sprite->y+i)%256)*rowstride) + (((sprite->x+j)%256)*4); // The %256 rotates pixels on a 32x8 wide display
-          uint8_t * pixel = &pixels[pixel_idx];
-          if (!(transparent & (1 << pxdata))) {
-              int color = (sprite->colors >> ((pxdata ^ colormask) *4)) & 0b1111;
-              *((uint32_t *) pixel) = palette[color];
-          }
-        }
-      }
-    }
-  }
-
+void redraw(int from_x, int from_y, int width, int height) {
   // Redraw selected area (NOTE: we actually still ignored the area selection in the sprite drawing just before!)
 //  cairo_surface_mark_dirty(surface);
   cairo_surface_mark_dirty_rectangle(surface, from_x*SCALE, from_y*SCALE, width*SCALE, height*SCALE);
 //  gtk_widget_queue_draw_area(drawing_area, 0, 0, 256*SCALE, 256*SCALE);
   gtk_widget_queue_draw_area(drawing_area, from_x*SCALE, from_y*SCALE, width*SCALE, height*SCALE);
+
+  pixels = cairo_image_surface_get_data(surface); // probably want to renew this after every commplete draw
 }
 
-// Due to the nature of GTK, we end up housing the main function
-// inside the display code
+void set_pixel(int x, int y, uint32_t color) {
+  int pixel_idx = (y*rowstride) + (x*4);
+  uint8_t * pixel = &pixels[pixel_idx];
+  *((uint32_t *) pixel) = color;
+}
+
+FILE * open_file (const char * filename, const char * mode) {
+  return fopen(filename, mode);
+}
+
+void beep(int frequency, int duration) {
+    // alas, not yet supported
+}
+
+// Entry point for the GTK / Cairo port
 int main (int argc, char ** argv) {
     pasta_init();
     tricolore_init();

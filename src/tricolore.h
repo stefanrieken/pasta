@@ -41,7 +41,11 @@ typedef struct Sprite {
   uint16_t colors; // 4x index into 4-bit color palette
 } Sprite;
 
-
-
-// This method must be implemented by a screen library
 void draw(int from_x, int from_y, int width, int height);
+
+// These methods must be implemented by a screen library
+void set_pixel(int x, int y, uint32_t color);
+void redraw(int from_x, int from_y, int width, int height);
+
+// Non-screen functions expected to exist on the Tricolore platform as well
+void beep(int frequency, int duration);

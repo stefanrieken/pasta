@@ -5,11 +5,11 @@
 #include "hardware/pwm.h"
 #include "hardware/clocks.h"
 
-#include "pasta.h"
+#include "../pasta.h"
+#include "../ssd1306.h"
 
-#include "ssd1306.h"
-#include "ascii1.xbm"
-#include "ascii2.xbm"
+#include "../ascii1.xbm"
+#include "../ascii2.xbm"
 
 #ifdef PICO_RP2350
 #define AUDIO_ENABLE_PIN 20
@@ -32,22 +32,13 @@ enum {
 
 // speaker pwm = gpio28
 uint slice_num;
-void beep(uint slice_num, int frequency, int duration) {
+void beep(int frequency, int duration) {
   if (frequency == 0) { sleep_ms(duration + (duration / 2)); return; }
 
   pwm_config cfg = pwm_get_default_config();
   pwm_set_chan_level(slice_num,PWM_CHAN_A,0);
   pwm_set_enabled(slice_num, false);
 
-#ifdef PICO_RP2350
-  float div = (float)clock_get_hz(clk_sys) / (frequency * 10000);
-
-  pwm_config_set_clkdiv(&cfg, div);
-  pwm_config_set_wrap(&cfg, 10000);
-
-  pwm_init(slice_num, &cfg, true);
-  pwm_set_gpio_level(AUDIO_PWM_PIN, 5000);
-#else
   // This calculation copied verbatim from "Simple Sound with C"
   // https://forums.raspberrypi.com/viewtopic.php?t=310320
   uint count = 125000000 * 16 / frequency;
@@ -59,7 +50,6 @@ void beep(uint slice_num, int frequency, int duration) {
 
   pwm_init(slice_num, &cfg, true);
   pwm_set_chan_level(slice_num,PWM_CHAN_A,cfg.top / 2);
-#endif
 
   pwm_set_enabled(slice_num, true);
   sleep_ms(duration);
@@ -84,7 +74,6 @@ void write_string(char * string, unsigned char * framebuffer, int x, int y) {
   for (int i=0; i<strlen(string);i++) write_char(string[i], framebuffer, x+(i*8), y);
 }
 
-#ifndef PICO_RP2350
 void cls() {
     write_string("         ", &memory[TILE_MEM], 0, 0);
     write_string("         ", &memory[TILE_MEM], 0, 8);
@@ -92,7 +81,6 @@ void cls() {
     write_string("         ", &memory[TILE_MEM], 0, 24);
     display_write_buffer(&memory[TILE_MEM], 72*40 / 8);
 }
-#endif
 
 uint16_t thumby_prim_group_cb(uint8_t prim) {
     uint16_t n = peek(&argstack);
@@ -106,9 +94,8 @@ uint16_t thumby_prim_group_cb(uint8_t prim) {
         case PRIM_BEEP:
             if(n > 1) frequency = item(&argstack, n--);
             if(n > 1) duration  = item(&argstack, n--);
-            beep(slice_num, frequency, duration);
+            beep(frequency, duration);
             break;
-#ifndef PICO_RP2350
         case PRIM_WRITE:;
             if (n < 2) return 0;
             int str = item(&argstack, n--);
@@ -120,60 +107,57 @@ uint16_t thumby_prim_group_cb(uint8_t prim) {
         case PRIM_CLS:;
             cls();
             break;
-#endif
     }
+
+    return result;
 }
 
 void register_thumby_prims() {
-#ifdef PICO_RP2350
-    // no screen yet, just init audo
-
-    gpio_init(AUDIO_ENABLE_PIN);
-    gpio_set_dir(AUDIO_ENABLE_PIN, GPIO_OUT);
-    gpio_put(AUDIO_ENABLE_PIN, 0);
-
-    engine_display_gc9107_init();
-
-    // write a little demo gradient
-    uint16_t * buffer = malloc(128*128*sizeof(uint16_t));
-    for (int i=0; i<128*128; i++) {
-      buffer[i]=i<<4;
-    }
-    engine_display_gc9107_update(buffer);
-#else
     display_init();
     display_set_brightness(120);
     write_string("PASTA V1", &memory[TILE_MEM], 0, 0); 
     write_string("READY.", &memory[TILE_MEM], 0, 16); 
     write_string(">", &memory[TILE_MEM], 0, 24); 
     display_write_buffer(&memory[TILE_MEM], 72*40 / 8);
-#endif
 
     // init buzzer PWM = gpio 28 (thumby) / gpio 23 (thumby color)
     slice_num = pwm_gpio_to_slice_num(AUDIO_PWM_PIN);
     gpio_set_function(AUDIO_PWM_PIN, GPIO_FUNC_PWM);
 
-#ifdef PICO_RP2350
-    pwm_config audio_pwm_pin_config = pwm_get_default_config();
-    pwm_config_set_clkdiv_int(&audio_pwm_pin_config, 1);
-    pwm_config_set_wrap(&audio_pwm_pin_config, 512);   // 150MHz / 512 = 292kHz
-    pwm_init(slice_num, &audio_pwm_pin_config, true);
-
-    gpio_put(AUDIO_ENABLE_PIN, 1);
-#endif
-
     // Play a starting melody :)
-    beep(slice_num, 440, 100);
-    beep(slice_num, 660, 100);
+    beep(440, 100);
+    beep(660, 100);
 
     getchar(); // await first input on serial
 
-#ifndef PICO_RP2350
-    printf("Memory is %p\n", memory);
     cls();
-#endif
+
     uint8_t group = add_primitive_group(thumby_prim_group_cb);
     add_variable("beep", add_primitive(group | PRIM_BEEP));
     add_variable("write", add_primitive(group | PRIM_WRITE));
     add_variable("cls", add_primitive(group | PRIM_CLS));
+}
+
+
+// These are linker symbols. Rather than pointing to memory containing a value,
+// their 'address' itself is the value. Their type is kind of bogus, but makes
+// the C compiler happy.
+extern void * _binary_recipes_lib_pasta_start;
+extern void * _binary_recipes_lib_pasta_size;
+
+// Opens only known, linked files
+FILE * open_file (const char * filename, const char * mode) {
+    if (strcmp("recipes/lib.pasta", filename) == 0) {
+        return fmemopen((void *) &_binary_recipes_lib_pasta_start, (ptrdiff_t) &_binary_recipes_lib_pasta_size, mode);
+    }
+    return NULL;
+}
+
+// Entry point for the Thumby port
+int main (int argc, char ** argv) {
+    stdio_init_all();
+    pasta_init();
+    register_thumby_prims();
+//    parse(stdin, true);
+    mainloop(NULL);
 }

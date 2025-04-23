@@ -123,6 +123,6 @@ define "catwalk" {
 
         catchup
     }
-}
+};
 
 catwalk

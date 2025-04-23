@@ -2,9 +2,8 @@
 #include <stdbool.h>
 #include <stdio.h>
 
-#include <gtk/gtk.h>
-#include <gdk/gdk.h>
-#include <cairo.h>
+// really only for file_open
+#include "pasta.h"
 
 uint8_t bitmapheader[54];
 //uint32_t palette[4];
@@ -35,7 +34,7 @@ static void write_data(FILE * file, uint32_t data) {
  * bitmaps (they expect 1, 4 or 8).
  */
 bool quickread_2bitmap(const char * filename, char * buffer, uint32_t * palette) {
-    FILE * file = fopen(filename, "rb");
+    FILE * file = open_file(filename, "rb");
     if (file == NULL) {
         printf("file not found\n");
         return false;

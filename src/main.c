@@ -1,16 +1,12 @@
 #include "pasta.h"
 
-#ifdef PICO_SDK
-#include "pico/stdlib.h"
-#endif
+FILE * open_file (const char * filename, const char * mode) {
+  return fopen(filename, mode);
+}
 
+// This is the entry point for plain Pasta only;
+// other implementations have their own main.
 int main (int argc, char ** argv) {
-#ifdef PICO_SDK
-    stdio_init_all();
-    pasta_init();
-    parse(stdin, true);
-#else
     pasta_init();
     mainloop(&argv[1]);
-#endif
 }

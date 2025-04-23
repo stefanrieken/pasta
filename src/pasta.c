@@ -10,9 +10,6 @@
 #include "base.h"
 #include "int.h"
 #include "chef.h"
-#ifdef PICO_SDK
-#include "thumby.h"
-#endif
 
 uint8_t * memory;
 
@@ -83,11 +80,19 @@ uint16_t bind(uint16_t value) {
 
 
 void ls() {
-    printf("Known variables:");
+    printf("Known variables: ");
     int i = mem[VARS];
     while(i < mem[TOP_OF+VARS]) {
         Variable * var = (Variable *) &memory[i];
-        printf(" %s (%d)", str(var->name), var->value);
+
+#ifdef LEXICAL_SCOPING
+        // Instead of printing "(closure)" a thousand times,
+        // print a '*' to suggest that the preceding var may have been a function.
+//        if (var->name == CLOSURE) { if (i != mem[VARS]) printf("*"); } else
+        if (var->name != CLOSURE)
+#endif
+//        printf(" %s (%d)", str(var->name), var->value);
+        printf("%s ", str(var->name));
         i += sizeof(Variable);
     }
     printf("\n");
@@ -528,23 +533,22 @@ void pasta_init() {
     register_base_prims();
     register_int_prims();
     register_chef_prims();
-#ifdef PICO_SDK
-    register_thumby_prims();
-#endif
+
+    FILE * infile;
+    if ((infile = open_file("recipes/lib.pasta", "rb"))) {
+        parse(infile, true);
+        fclose(infile);
+    }
 }
 
 void * mainloop(void * arg) {
     char ** args = (char **) arg;
 
     int i = 0;
-    // Load Pasta lib
     FILE * infile;
-    if ((infile = fopen("recipes/lib.pasta", "r"))) {
-        parse(infile, true);
-        fclose(infile);
-    }
+    // Pasta lib should already be loaded at this point
 
-    while (args[i] != NULL && strcmp(args[i], "-") != 0) {
+    while (args != NULL && args[i] != NULL && strcmp(args[i], "-") != 0) {
         infile = fopen(args[i++], "r");
         parse(infile, true);
         fclose(infile);
@@ -552,10 +556,12 @@ void * mainloop(void * arg) {
 
     // Allow interactive running even after file args using "-"
     if (i == 0 || (args[i] != NULL && strcmp(args[i], "-") == 0)) {
+/*
         if (isatty(fileno(stdin))) {
             strings();
             ls();
         }
+*/
         parse(stdin, true);
     }
     return NULL;

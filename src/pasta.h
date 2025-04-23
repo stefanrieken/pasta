@@ -54,6 +54,11 @@ enum {
 
 #define MAX_MEM (64 * 1024)
 
+
+// Wrapper so that implementations can select between using
+// fopen (where files are separate) or fmemopen (where files are linked in).
+FILE * open_file (const char * filename, const char * mode);
+
 //
 // Callbacks
 //
