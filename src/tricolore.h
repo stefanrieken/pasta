@@ -49,3 +49,7 @@ void redraw(int from_x, int from_y, int width, int height);
 
 // Non-screen functions expected to exist on the Tricolore platform as well
 void beep(int frequency, int duration);
+
+#ifdef PICO_SDK
+void get_button_state();
+#endif

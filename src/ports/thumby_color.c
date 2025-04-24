@@ -71,6 +71,31 @@ void beep(int frequency, int duration) {
   sleep_ms(duration / 2);
 }
 
+#define BTN_DPAD_L 0
+#define BTN_DPAD_U 1
+#define BTN_DPAD_R 2
+#define BTN_DPAD_D 3
+#define BTN_B 21
+#define BTN_A 25
+
+void setup_button(int gpio) {
+    gpio_init(gpio);
+    gpio_pull_up(gpio);
+    gpio_set_dir(gpio, GPIO_IN);
+}
+
+void get_button_state() {
+    direction->value = 0;
+    // active low
+    if (!gpio_get(BTN_DPAD_L)) direction->value = ((direction->value & PLANE_VERT) | DIR_LEFT);
+    if (!gpio_get(BTN_DPAD_U)) direction->value = ((direction->value & PLANE_HOR) | DIR_UP);
+    if (!gpio_get(BTN_DPAD_R)) direction->value = ((direction->value & PLANE_VERT) | DIR_RIGHT);
+    if (!gpio_get(BTN_DPAD_D)) direction->value = ((direction->value & PLANE_HOR) | DIR_DOWN);
+
+    if (!gpio_get(BTN_A)) beep(440, 100);
+    if (!gpio_get(BTN_B)) beep(660, 100);
+}
+
 // These are linker symbols. Rather than pointing to memory containing a value,
 // their 'address' itself is the value. Their type is kind of bogus, but makes
 // the C compiler happy.
@@ -100,11 +125,7 @@ FILE * open_file (const char * filename, const char * mode) {
     return NULL;
 }
 
-int main (int argc, char ** argv) {
-    stdio_init_all();
-    pasta_init();
-    tricolore_init();
-
+void thumby_color_init() {
     gpio_init(AUDIO_ENABLE_PIN);
     gpio_set_dir(AUDIO_ENABLE_PIN, GPIO_OUT);
     gpio_put(AUDIO_ENABLE_PIN, 0);
@@ -137,11 +158,25 @@ int main (int argc, char ** argv) {
 
     gpio_put(AUDIO_ENABLE_PIN, 1);
 
+    setup_button(BTN_DPAD_L);
+    setup_button(BTN_DPAD_U);
+    setup_button(BTN_DPAD_R);
+    setup_button(BTN_DPAD_D);
+    setup_button(BTN_A);
+    setup_button(BTN_B);
+
     // Play a starting melody :)
     beep(440, 100);
     beep(660, 100);
 
     getchar(); // await first input on serial
+}
 
-   mainloop(NULL);
+int main (int argc, char ** argv) {
+    stdio_init_all();
+    thumby_color_init();
+    pasta_init();
+    tricolore_init();
+
+    mainloop(NULL);
 }

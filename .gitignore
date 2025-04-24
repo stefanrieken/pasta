@@ -1,4 +1,6 @@
 pasta
 tricolore
 *.o
+*.obj
 rp2040
+rp2350

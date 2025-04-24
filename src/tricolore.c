@@ -86,7 +86,8 @@ uint16_t disp_prim_group_cb(uint8_t prim) {
             } while(this_time.tv_sec == last_time.tv_sec && (this_time.tv_nsec >> 24) == (last_time.tv_nsec >> 24));
             last_time = this_time;
 #else
-            sleep_us(10000);
+            get_button_state();
+//            sleep_us(5000);
 #endif
             result = screen_active;
             break;

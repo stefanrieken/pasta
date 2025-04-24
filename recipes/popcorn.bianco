@@ -1,11 +1,4 @@
-#
-# This program is intended to run on Pasta Bianco on the Thumby
-#
-# To build Pasta Bianco, type 'make rp2040'.
-# (Assumption: the Pico SDK is located alongside the Pasta project.)
-# 
-# 
-write "Popcorn!"
+write screen "Popcorn!"
 
 define "true" 1;
 define "false" 0;

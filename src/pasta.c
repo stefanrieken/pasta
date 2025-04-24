@@ -29,7 +29,7 @@ PrimGroupCb prim_groups[MAX_PRIM_GROUPS];
 int getch(FILE * file) {
     int ch = fgetc(file);
     if (ch == '\r') ch = '\n'; // \r is EOL in serial terminal
-    printf("%c", ch);
+    if (isatty(fileno(file))) printf("%c", ch);
     return ch;
 }
 #else

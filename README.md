@@ -30,37 +30,11 @@ Tricolore is 80's chic:
 - Sporting up to 16 layers of tile/sprite/character maps,
 - Each with its own palette of 4 colors (or 3 colors plus transparency) out of a system wide 16-color pallete.
 
-## For the Thumby (Color)
-Tricolore can be built to run on the Thumby Color. It requires a copy of the
-Pico SDK with the TinyUSB submodule to be found next to the Pasta folder.
-
-Type `make rp2350` to make the executables, then copy `tricolore.uf2` to your
-Thumby Color. Alongside a 'ready' message on the Thumby screen, You should now
-be able to contact your Thumby over serial. From there, press enter to initiate
-the Pasta REPL, where you can also copy / paste any relevant samples.
-
-(Note: presently Tricolore assumes a 256x256 display, which is cut off to
-128x128 on the Thumby Color. Think of it as Pasta Tricolore Quattro Formaggi.)
-
-Pasta **Bianco** is a minimal serving whipped up for the original Thumby. Type
-`make rp2040` to build this version.
-
-While neither embedded versions currently have working buttons, they do both
-feature a working `beep` command, which is still wanting in the PC build.
-
-## Status
-Having had experience with similar recipes, Pasta was cooked up on a whim, but
-is already starting to feel close to _al dente_, especially when considering
-that its quirky 80's vibe is a feature, not a bug.
-
-Tricolore perfectly matches both language and vibe. and with a growing number
-of self-hosted utility programs, it is quickly coming around to being a viable
-retroprogramming platform.
-
 ## Building, running and examples
-For the Tricolore build to succeed, in addition to a regular C compiler, you
-need the GTK headers and libs. On a Mac using homebrew, run
-`brew install gtk+ pkg-config`.
+Plain Pasta should build on a regular (Posix) C compiler.
+
+For the Tricolore build to succeed, you also need the GTK headers and libs.
+On a Mac using homebrew, run `brew install gtk+ pkg-config`.
 
 Next, typing 'make' should produce 2 local executables:
 - `pasta` is the core interpreter
@@ -70,3 +44,33 @@ Both accept file arguments. Examples for various features are found under
 [recipes](recipes/). Add a final '-' argument to enter the REPL after running a
 file.
 
+While the PC version of Tricolore features mouse input (and a wider screen), it
+presently still lacks audio.
+
+## For the Thumby Color
+Tricolore can be built to run on the Thumby Color. It requires a copy of the
+Pico SDK with the TinyUSB submodule to be found next to the Pasta folder.
+
+Type `make rp2350` to make the executables, then copy `tricolore.uf2` to your
+Thumby Color. Alongside a 'ready' message on the Thumby screen, You should now
+be able to contact your Thumby over serial. From there, press enter to initiate
+the Pasta REPL, where you can also copy / paste any relevant samples.
+
+(Presently Tricolore assumes a 256x256 display, which is cut off to 128x128 on
+the Thumby Color. Think of it as Pasta Tricolore Quattro Formaggi.)
+
+## For the original Thumby
+Pasta **Bianco** is a minimal serving whipped up for the original Thumby. Type
+`make rp2040` to build this version, then copy `bianco.uf2` to your Thumby.
+
+Being a minimalistic subset of Tricolore functionality, the `.bianco` scripts
+can also be run in Tricolore.
+
+## Status
+Having had experience with similar recipes, Pasta was cooked up on a whim, but
+is already starting to feel close to _al dente_, especially when considering
+that its quirky 80's vibe is a feature, not a bug.
+
+Tricolore perfectly matches both language and vibe. and with a growing number
+of self-hosted utility programs, it is quickly coming around to being a viable
+retroprogramming platform.

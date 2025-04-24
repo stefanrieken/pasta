@@ -1,0 +1,9 @@
+loop {
+#    cls;
+    if (= (& direction 0b0011) 0b0001) { write screen "up   " };
+    if (= (& direction 0b0011) 0b0011) { write screen "down " };
+    if (= (& direction 0b1100) 0b0100) { write screen "left " };
+    if (= (& direction 0b1100) 0b1100) { write screen "right" };
+    draw;
+    catchup
+}

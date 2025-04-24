@@ -11,12 +11,7 @@
 #include "../ascii1.xbm"
 #include "../ascii2.xbm"
 
-#ifdef PICO_RP2350
-#define AUDIO_ENABLE_PIN 20
-#define AUDIO_PWM_PIN 23
-#else
 #define AUDIO_PWM_PIN 28
-#endif
 
 // We don't currently use tiles,
 // but default the display frame buffer to the same location
@@ -24,10 +19,13 @@
 
 #define SCREEN_WIDTH_BYTES 9
 // Thumby primitive defs
+// We try to maintain this as a compatible subset of Tricolore
 enum {
-    PRIM_BEEP,
     PRIM_WRITE,
-    PRIM_CLS
+    PRIM_DRAW,
+    PRIM_CATCHUP,
+    PRIM_CLS, // TODO no cls equivalent in Tricolore
+    PRIM_BEEP
 };
 
 // speaker pwm = gpio28
@@ -56,6 +54,45 @@ void beep(int frequency, int duration) {
   pwm_set_enabled(slice_num, false);
   sleep_ms(duration / 2);
 }
+
+Variable * direction;
+
+// see tricolore.h
+#define DIR_LEFT   0b0100
+#define DIR_RIGHT  0b1100
+#define DIR_UP     0b0001
+#define DIR_DOWN   0b0011
+#define PLANE_HOR  0b1100
+#define PLANE_VERT 0b0011
+
+#define BTN_DPAD_L 3
+#define BTN_DPAD_U 4
+#define BTN_DPAD_R 5
+#define BTN_DPAD_D 6
+#define BTN_B 24
+#define BTN_A 27
+
+static inline
+void setup_button(int gpio) {
+    gpio_init(gpio);
+    gpio_pull_up(gpio);
+    gpio_set_dir(gpio, GPIO_IN);
+}
+
+// We don't presently have a 'direction' variable setup as in Tricolore
+// FOr now, settle for making a beep sound
+void get_button_state() {
+    direction->value = 0;
+    // active low
+    if (!gpio_get(BTN_DPAD_L)) direction->value = ((direction->value & PLANE_VERT) | DIR_LEFT);
+    if (!gpio_get(BTN_DPAD_U)) direction->value = ((direction->value & PLANE_HOR) | DIR_UP);
+    if (!gpio_get(BTN_DPAD_R)) direction->value = ((direction->value & PLANE_VERT) | DIR_RIGHT);
+    if (!gpio_get(BTN_DPAD_D)) direction->value = ((direction->value & PLANE_HOR) | DIR_DOWN);
+
+    if (!gpio_get(BTN_A)) beep(440, 100);
+    if (!gpio_get(BTN_B)) beep(660, 100);
+}
+
 
 // As the screen is arranged in column bytes,
 // the input xbms are rotated to match.
@@ -91,28 +128,37 @@ uint16_t thumby_prim_group_cb(uint8_t prim) {
     int result = 0;
 
     switch(prim) {
-        case PRIM_BEEP:
-            if(n > 1) frequency = item(&argstack, n--);
-            if(n > 1) duration  = item(&argstack, n--);
-            beep(frequency, duration);
+        case PRIM_CATCHUP:
+            get_button_state();
+//            sleep_us(10000);
+            result = 1; // allows catchup as loop result
             break;
         case PRIM_WRITE:;
-            if (n < 2) return 0;
+            if (n < 3) return 0;
+            int where = item(&argstack, n--);
             int str = item(&argstack, n--);
             int x = (n > 1) ? item(&argstack, n--) : 0;
             int y = (n > 1) ? item(&argstack, n--) : 0;
-            write_string(&memory[str], &memory[TILE_MEM], x, y);
+            write_string(&memory[str], &memory[where], x, y);
+            // Fallthrough: in Bianco, you get a 'draw' for free with every write
+        case PRIM_DRAW:;
+            n = 0; // ignore coordinates and draw everything
             display_write_buffer(&memory[TILE_MEM], 72*40 / 8);
             break;
         case PRIM_CLS:;
             cls();
+            break;
+        case PRIM_BEEP:
+            if(n > 1) frequency = item(&argstack, n--);
+            if(n > 1) duration  = item(&argstack, n--);
+            beep(frequency, duration);
             break;
     }
 
     return result;
 }
 
-void register_thumby_prims() {
+void thumby_init() {
     display_init();
     display_set_brightness(120);
     write_string("PASTA V1", &memory[TILE_MEM], 0, 0); 
@@ -124,6 +170,24 @@ void register_thumby_prims() {
     slice_num = pwm_gpio_to_slice_num(AUDIO_PWM_PIN);
     gpio_set_function(AUDIO_PWM_PIN, GPIO_FUNC_PWM);
 
+    setup_button(BTN_DPAD_L);
+    setup_button(BTN_DPAD_U);
+    setup_button(BTN_DPAD_R);
+    setup_button(BTN_DPAD_D);
+    setup_button(BTN_A);
+    setup_button(BTN_B);
+
+    direction = add_variable("direction", 0);
+    // Define "screen" so that we can say "write screen" just like in Tricolore.
+    //
+    // TODO Several things are not ideal here:
+    // - This definition is nonspecial and should be in a "lib" file (which we can now bundle)
+    // - Screen memory should not be equivalent to Tricolore's tile mem; but
+    // - Tricolore's actual screen memory location might be revisited if 128x128 becomes the screen norm
+    //
+    // Presently just go with the current value.
+    add_variable("screen", TILE_MEM);
+
     // Play a starting melody :)
     beep(440, 100);
     beep(660, 100);
@@ -131,11 +195,15 @@ void register_thumby_prims() {
     getchar(); // await first input on serial
 
     cls();
+}
 
+void register_thumby_prims() {
     uint8_t group = add_primitive_group(thumby_prim_group_cb);
-    add_variable("beep", add_primitive(group | PRIM_BEEP));
     add_variable("write", add_primitive(group | PRIM_WRITE));
+    add_variable("draw", add_primitive(group | PRIM_DRAW));
+    add_variable("catchup", add_primitive(group | PRIM_CATCHUP));
     add_variable("cls", add_primitive(group | PRIM_CLS));
+    add_variable("beep", add_primitive(group | PRIM_BEEP));
 }
 
 
@@ -157,6 +225,7 @@ FILE * open_file (const char * filename, const char * mode) {
 int main (int argc, char ** argv) {
     stdio_init_all();
     pasta_init();
+    thumby_init();
     register_thumby_prims();
 //    parse(stdin, true);
     mainloop(NULL);
