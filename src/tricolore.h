@@ -1,6 +1,3 @@
-#define SCREEN_WIDTH 32
-#define SCREEN_HEIGHT 32
-
 // palette register is placed after 16 sprites
 #define SPRITE_MEM 0x0200
 #define PALETTE_MEM (SPRITE_MEM + 16*16)
@@ -13,6 +10,7 @@ extern Variable * direction;
 extern Variable * pointer_x;
 extern Variable * pointer_y;
 extern Variable * click;
+extern Variable * hires;
 
 extern bool screen_active;
 
@@ -27,6 +25,7 @@ extern bool screen_active;
 #define DIR_DOWN   0b0011
 #define PLANE_HOR  0b1100
 #define PLANE_VERT 0b0011
+#define PLANE_BTN 0b110000
 
 
 // TODO: thought we already were cramped for space here, but we only use 10 of the 16 bytes available!
@@ -46,6 +45,10 @@ void draw(int from_x, int from_y, int width, int height);
 // These methods must be implemented by a screen library
 void set_pixel(int x, int y, uint32_t color);
 void redraw(int from_x, int from_y, int width, int height);
+
+// And these properties
+extern int SCREEN_WIDTH; // retained caps from earlier define
+extern int SCREEN_HEIGHT;
 
 // Non-screen functions expected to exist on the Tricolore platform as well
 void beep(int frequency, int duration);

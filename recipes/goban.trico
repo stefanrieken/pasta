@@ -1,3 +1,6 @@
+# Enable hi-res mode
+set "hires" true;
+setallb screen_spr 0 0 32 32;
 
 # Give the goban its own sprite; mainly so that (bg) color scheme can differ from that of text screen
 define "goban_spr" (sprite 1)

@@ -10,9 +10,8 @@ loop {
     # set "cursor" (write cursor "\x1f"); # equivalent
     setb cursor 31;
     set "cursor" (+ 1 cursor);
-    ! (= (% cursor 32) 0)
+    % cursor 16
 }
-
 
 # Add a sprite
 define "sprite1" (sprite 1)
@@ -26,11 +25,11 @@ draw;
 
 define "pxtouches" {
     args "x" "y";
-    set "x" (% x 256);
-    set "y" (% y 256);
+    set "x" (% x 128);
+    set "y" (% y 128);
     # if y = 8-15, tile num should be 8; if 16-23, 16; if 24-31, 24
     # if x = 8-15, tile num should be +1
-    define "tile" (+ (* (/ y 8) 32) (/ x 8));
+    define "tile" (+ (* (/ y 8) 16) (/ x 8));
     define "map" (| (<< (getb screen_spr map1) 8) (getb screen_spr map0));
     getb map tile
 };
@@ -116,8 +115,10 @@ define "catwalk" {
         };
 
         if (| (/ diffy 4) (/ diffx 4)) {
-            setb sprite1 ypos (+ (getb sprite1 ypos) (/ diffy 4));
-            setb sprite1 xpos (+ (getb sprite1 xpos) (/ diffx 4));
+            # On 256x256, sprite coordinates rotate automatically as byte overflows
+            # On 128x128, we must manually rotate the sprite at end of screen
+            setb sprite1 ypos (% (+ (getb sprite1 ypos) (/ diffy 4)) 128);
+            setb sprite1 xpos (% (+ (getb sprite1 xpos) (/ diffx 4)) 128);
             draw
         };
 

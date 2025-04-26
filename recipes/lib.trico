@@ -19,7 +19,7 @@ define "sprite" {
 # Define text screen / background sprite
 define "screen_spr" (sprite 0)
 define "screen" (* 30 1024) # Location of screen data
-setallb screen_spr 0 0 32 32 (lsb screen) (msb screen) 1 0x00 0x10 0x30 # set scale=1x; default color scheme
+setallb screen_spr 0 0 16 16 (lsb screen) (msb screen) 1 0x00 0x10 0x30 # set scale=1x; default color scheme
 
 # Place palette (and display registers?) after 16 sprite regs (for somewhere to go)
 define "palette" (sprite 16)

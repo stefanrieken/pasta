@@ -1,3 +1,7 @@
+# Enable hi-res mode
+set "hires" true;
+setallb screen_spr 0 0 32 32;
+
 define "cursor" (write screen "\x7FTricolore\n\n")
 
 set "cursor" (write cursor "Cat chasing mouse!\x14\n")
@@ -14,6 +18,5 @@ loop {
         setb sprite1 ypos pointer_y;
         draw;
     };
-    catchup;
-    return true
+    catchup
 }

@@ -1,3 +1,7 @@
+# Enable hi-res mode
+set "hires" true;
+setallb screen_spr 0 0 32 32;
+
 define "cursor" screen;
 
 define "button" {

@@ -24,6 +24,11 @@ Variable * direction;
 Variable * pointer_x;
 Variable * pointer_y;
 Variable * click;
+Variable * hires;
+
+// This value is calculated during 'draw', but is also
+// used by the pointer coordinate calculation function
+int shift;
 
 #ifndef PICO_SDK
 struct timespec last_time;
@@ -39,6 +44,8 @@ enum {
 };
 
 uint16_t disp_prim_group_cb(uint8_t prim) {
+  shift = !hires->value && (SCREEN_WIDTH == 32);
+
     uint16_t n = peek(&argstack);
     uint16_t temp = 0, str = 0;
     uint16_t result = 0;
@@ -53,7 +60,7 @@ uint16_t disp_prim_group_cb(uint8_t prim) {
               str = item(&argstack, n--);
               while(memory[str] != 0) {
                 if(memory[str] == '\n') {
-                  temp = (temp / SCREEN_WIDTH) * SCREEN_WIDTH + SCREEN_WIDTH; // set cursor to new line (TODO does not compute end of screen!)
+                  temp = (temp / (SCREEN_WIDTH >> shift)) * (SCREEN_WIDTH >> shift) + (SCREEN_WIDTH >> shift); // set cursor to new line (TODO does not compute end of screen!)
                 } else if (memory[str] == 0x0f) { // 'shift out': used for inverse (may also be used to end reverse)
                   inverse ^= 0b10000000;
                 } else if (memory[str] == 0x10) { // 'shift in': used to end reverse
@@ -66,7 +73,8 @@ uint16_t disp_prim_group_cb(uint8_t prim) {
               }
             }
             result = temp; // return cursor position
-            break;
+// automatically fall through to draw after write
+//            break;
         case PRIM_DRAW:
             if (n > 1) from_x = item(&argstack, n--);
             if (n > 1) from_y = item(&argstack, n--);
@@ -117,7 +125,8 @@ void register_display_prims() {
     pointer_x = add_variable("pointer_x", 0);
     pointer_y = add_variable("pointer_y", 0);
     click = add_variable("click", 0);
-
+    hires = add_variable("hires", 0);
+  shift = !hires->value && (SCREEN_WIDTH == 32);
     add_variable("write", add_primitive(group | PRIM_WRITE));
     add_variable("draw", add_primitive(group | PRIM_DRAW));
     add_variable("catchup", add_primitive(group | PRIM_CATCHUP));
@@ -131,6 +140,12 @@ void register_display_prims() {
 
 void tricolore_init() {
     register_display_prims();
+
+#ifdef PICO_SDK
+    shift = 0;
+#else
+    shift = 1;
+#endif
 
     // Fill ascii
     quickread_2bitmap("assets/ascii1.bmp", &memory[TILE_MEM], (uint32_t *) &memory[PALETTE_MEM]);
@@ -155,6 +170,8 @@ void tricolore_init() {
 void draw(int from_x, int from_y, int width, int height) {
   // May not need to clear screen when redrawing full background / character screen
 
+  // If no hi res but screen width allows it, shift by one to get 'lo res'
+  shift = !hires->value && (SCREEN_WIDTH == 32);
   uint32_t * palette = (uint32_t *) &memory[PALETTE_MEM];
 
   // 16 sprite structs of size 16 = 256 bytes
@@ -163,16 +180,20 @@ void draw(int from_x, int from_y, int width, int height) {
     int transparent = sprite->flags & 0x0F;
     int scalex = ((sprite->flags >> 4) & 0b11)+1; // Can scale 2,3,4 times; maybe rather 2,4,8?
     int scaley = ((sprite->flags >> 6) & 0b11)+1;
+
+    scalex = scalex << shift; scaley = scaley << shift;
+
     if (sprite->width != 0 && sprite->height != 0) {
       int width_map = sprite->width; //(sprite->width + 7) / 8; // Even if width and height are not byte aligned, their map data is
 
       for (int i=0; i<sprite->height*8*scaley;i++) {
-        if (sprite->y+i < from_y || sprite->y+i >from_y+height) continue; // Some attempt to skip parts that don't need drawing
+        if ((sprite->y<<shift)+i < (from_y<<shift) || (sprite->y<<shift)+i >(from_y+height) << shift) continue; // Some attempt to skip parts that don't need drawing
 
         // Try to get some (partial) calculations before the next for loop, to avoid repetition
         int map_idx_h = (i/(8*scaley))*width_map;
+
         for (int j=0; j<sprite->width*8*scalex; j++) {
-          if (sprite->x+j < from_x || sprite->x+j >from_x+width) continue; // Some attempt to skip parts that don't need drawing
+          if ((sprite->x<<shift)+j < (from_x<<shift) || (sprite->x<<shift)+j >(from_x+width)<<shift) continue; // Some attempt to skip parts that don't need drawing
 
           // Normal mode: 8-bit tiles
           uint8_t tile_idx = memory[sprite->map + map_idx_h + j/(8*scalex)];
@@ -203,12 +224,12 @@ void draw(int from_x, int from_y, int width, int height) {
 
           if (!(transparent & (1 << pxdata))) {
               int color = (sprite->colors >> ((pxdata ^ colormask) *4)) & 0b1111;
-              set_pixel(((sprite->x+j)%(8*SCREEN_WIDTH)), ((sprite->y+i)%(8*SCREEN_HEIGHT)), palette[color]); // The $ allows for rotation
+              set_pixel((((sprite->x<<shift)+j)%(8*SCREEN_WIDTH<<shift)), (((sprite->y<<shift)+i)%(8*SCREEN_HEIGHT<<shift)), palette[color]); // The % allows for rotation
           }
         }
       }
     }
   }
 
-  redraw(from_x, from_y, width, height);
+  redraw(from_x<<shift, from_y<<shift, width<<shift, height<<shift);
 }

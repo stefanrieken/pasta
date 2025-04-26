@@ -5,7 +5,13 @@
 #include "../pasta.h"
 #include "../tricolore.h"
 
+// This value refers to Cairo's 'zoom level' only
 #define SCALE 2
+
+// These values refer to our internal idea of a max resolution,
+// and are consulted by Tricolore's 'draw' routine.
+int SCREEN_WIDTH=32;
+int SCREEN_HEIGHT=32;
 
 static cairo_surface_t * surface = NULL;
 static cairo_pattern_t * pattern;
@@ -95,9 +101,10 @@ void key_release_cb(GtkWidget *widget, GdkEventKey * event, gpointer userdata) {
     }
 }
 
+extern int shift; // see tricolore.c . To be further refined
 void motion_cb(GtkWidget *widget, GdkEventMotion * event, gpointer userdata) {
-    pointer_x->value = event->x / SCALE;
-    pointer_y->value = event->y / SCALE;
+    pointer_x->value = (((uint16_t) event->x) >> shift) / SCALE;
+    pointer_y->value = (((uint16_t) event->y) >> shift) / SCALE;
 }
 
 void button_cb(GtkWidget *widget, GdkEventButton * event, gpointer userdata) {
@@ -164,6 +171,8 @@ FILE * open_file (const char * filename, const char * mode) {
 
 void beep(int frequency, int duration) {
     // alas, not yet supported
+//    gdk_display_beep(gdk_display_get_default());
+//    usleep((duration + (duration / 2)) *  1000);
 }
 
 // Entry point for the GTK / Cairo port

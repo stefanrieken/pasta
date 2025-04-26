@@ -8,6 +8,9 @@
 #include "../pasta.h"
 #include "../tricolore.h"
 
+int SCREEN_WIDTH=16; // retained caps from earlier define
+int SCREEN_HEIGHT=16;
+
 extern void engine_display_gc9107_update(uint16_t *screen_buffer_to_render);
 extern void engine_display_gc9107_init();
 
