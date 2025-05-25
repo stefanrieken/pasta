@@ -514,7 +514,9 @@ void pasta_init() {
     memory[mem[VARS]] = 0;
     memory[mem[STRINGS]] = 0;
 
-    mem[TOP_OF+DATA] = mem[DATA];
+    // Setting top of regs / data == bottom of temporal expression value stack
+    // to be just after reserved regs (TBD).
+    mem[TOP_OF+DATA] = 0x00C0; //mem[DATA];
     mem[TOP_OF+VARS] = mem[VARS];
     mem[TOP_OF+STRINGS] = mem[STRINGS];
     mem[TOP_OF+CODE] = mem[CODE];

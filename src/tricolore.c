@@ -139,6 +139,10 @@ void register_display_prims() {
 }
 
 void tricolore_init() {
+    // Moving end of regs (= bottom of expression stack) so that
+    // it includes palette and sprite regs.
+    mem[TOP_OF+DATA] = 0x0200;
+
     register_display_prims();
 
 #ifdef PICO_SDK

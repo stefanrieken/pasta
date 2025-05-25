@@ -1,6 +1,8 @@
 // palette register is placed after 16 sprites
+// Sprite memory fits immediately after 'top-of' registers, in 0x0020-0x02FF)
 #define SPRITE_MEM 0x0200
-#define PALETTE_MEM (SPRITE_MEM + 16*16)
+//#define PALETTE_MEM (SPRITE_MEM + 16*16)
+#define PALETTE_MEM 0x00C0
 
 #define TILE_MEM 0x6000
 

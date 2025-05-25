@@ -100,7 +100,7 @@ uint16_t base_prim_group_cb(uint8_t prim) {
             result = 0;
             break;
         case PRIM_CODE:
-            print_asm(&memory[mem[CODE]], mem[END_OF+CODE] - mem[CODE]);
+            print_asm(&memory[mem[CODE]], mem[TOP_OF+CODE] - mem[CODE]);
             result = 0;
             break;
         case PRIM_IF:
