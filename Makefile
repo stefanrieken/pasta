@@ -1,5 +1,5 @@
 CFLAGS=-Wall -Wunused -ffunction-sections -fdata-sections -DLEXICAL_SCOPING
-OBJS=src/stack.o src/base.o src/int.o src/pasta.o src/chef.c
+OBJS=src/stack.o src/base.o src/int.o src/pasta.o src/file.o
 
 EMBEDDEDS=assets/ascii1.bmp.obj assets/ascii2.bmp.obj recipes/lib.pasta.obj recipes/lib.trico.obj
 
@@ -7,6 +7,15 @@ EMBEDDEDS=assets/ascii1.bmp.obj assets/ascii2.bmp.obj recipes/lib.pasta.obj reci
 	$(CC) $(CFLAGS) -c $< -o $@ `pkg-config --cflags cairo gdk-3.0 gtk+-3.0 libpng`
 
 all: pasta tricolore
+
+# This target demonstrates how to script generating a Pasta binary
+# (for now, manually close the Tricolore screen to continue to saving)
+hello.ram: tricolore
+	echo 'save "hello.ram"' | ./tricolore recipes/hello.trico -
+
+## Demonstration of how to make an (initial) empty ram file
+lib.ram:
+	dd if=/dev/zero of=lib.ram bs=1 count=32
 
 pasta: $(OBJS) src/main.o
 	$(CC) $(CFLAGS) $^ -o $@

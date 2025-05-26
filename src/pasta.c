@@ -9,7 +9,7 @@
 #include "stack.h"
 #include "base.h"
 #include "int.h"
-#include "chef.h"
+#include "file.h"
 
 uint8_t * memory;
 
@@ -42,6 +42,7 @@ int getch(FILE * file) {
  */
 uint16_t unique_string(char * string) {
     int i = mem[STRINGS];
+
     while (memory[i] != 0) {
         if (strcmp(string, (char *) (&memory[i+1])) == 0) return i+1;
         i += memory[i]; // follow chain
@@ -56,10 +57,8 @@ uint16_t unique_string(char * string) {
     strcpy((char *) (&memory[result]), string);
     memory[i+len+1] = 0; // mark end of chain
 
-    // Update top register even if we don't actively read it
-    // Little endian
-    memory[TOP_OF+STRINGS] = (i+len+1) & 0xFF;
-    memory[TOP_OF+STRINGS] = ((i+len+1) >> 8) & 0xFF;
+    // Update top register
+    mem[TOP_OF+STRINGS] = i+len+1;
 
     return result;
 }
@@ -331,7 +330,7 @@ void add_command(unsigned char cmd, uint16_t value) {
     } else {
         memory[mem[TOP_OF+CODE]++] = cmd | (value << 2);
     }
-    if(mem[TOP_OF+CODE] >= mem[END_OF+CODE]) printf("Code overflow!\n");
+    if(mem[TOP_OF+CODE] >= (uint16_t) (mem[END_OF+CODE]-1)) printf("Code overflow!\n");
 }
 
 int parse_int(FILE * infile, int ch, int * result, int radix) {
@@ -508,7 +507,7 @@ void pasta_init() {
     mem[VARS] = 0x0400;
     mem[STRINGS] = 0x1000;
     mem[CODE] = 0x2000;
-    mem[END_OF+CODE] = 0xFFFF; // Use all mem unless a specific machine registers more memory blocks
+//    mem[END_OF+CODE] = 0xFFFF; // Use all mem unless a specific machine registers more memory blocks
 
     // Init segments and their tops
     memory[mem[VARS]] = 0;
@@ -534,7 +533,7 @@ void pasta_init() {
 
     register_base_prims();
     register_int_prims();
-    register_chef_prims();
+    register_file_prims();
 
     FILE * infile;
     if ((infile = open_file("recipes/lib.pasta", "rb"))) {

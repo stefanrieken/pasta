@@ -1,0 +1,17 @@
+# Write (full) initial state to file
+save "test.ram"
+
+# Prove a point by clearing tile memory
+define "i" 0
+loop {
+    setb 0x6000 i 0;
+    add "i" 1;
+    < i 0x1000
+}
+
+# Then read data again
+load "test.ram"
+
+# To show that data has magically returned,
+# run e.g. ./tricolore recipes/file.pasta recipes/hello.trico
+# Comment out the 'load' instruction to verify the difference.

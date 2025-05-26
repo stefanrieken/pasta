@@ -1,10 +1,7 @@
-// palette register is placed after 16 sprites
-// Sprite memory fits immediately after 'top-of' registers, in 0x0020-0x02FF)
-#define SPRITE_MEM 0x0200
-//#define PALETTE_MEM (SPRITE_MEM + 16*16)
-#define PALETTE_MEM 0x00C0
-
-#define TILE_MEM 0x6000
+// Sprite registers (not to be confused with sprite data memory)
+#define SPRITE_REGS 0x0200
+// Palette
+#define PALETTE_REGS 0x00C0
 
 void tricolore_init();
 
@@ -41,6 +38,12 @@ typedef struct Sprite {
   uint8_t flags; // msb->lsb: scaley (2b) scalex (2b), transparent (4b);
   uint16_t colors; // 4x index into 4-bit color palette
 } Sprite;
+
+// Extend start-of / top-of register
+enum {
+    TILES=5,
+    SCREEN
+};
 
 void draw(int from_x, int from_y, int width, int height);
 

@@ -143,6 +143,12 @@ void tricolore_init() {
     // it includes palette and sprite regs.
     mem[TOP_OF+DATA] = 0x0200;
 
+    mem[TILES] = 0x6000;
+    mem[SCREEN] = 0x7800;
+
+    mem[TOP_OF+TILES] = mem[TILES];
+    mem[TOP_OF+SCREEN] = mem[SCREEN];
+
     register_display_prims();
 
 #ifdef PICO_SDK
@@ -152,8 +158,10 @@ void tricolore_init() {
 #endif
 
     // Fill ascii
-    quickread_2bitmap("assets/ascii1.bmp", &memory[TILE_MEM], (uint32_t *) &memory[PALETTE_MEM]);
-    quickread_2bitmap("assets/ascii2.bmp", &memory[TILE_MEM+0x0400], (uint32_t *) &memory[PALETTE_MEM]);
+    quickread_2bitmap("assets/ascii1.bmp", &memory[mem[TOP_OF+TILES]], (uint32_t *) &memory[PALETTE_REGS]);
+    mem[TOP_OF+TILES] += 0x400;
+    quickread_2bitmap("assets/ascii2.bmp", &memory[mem[TOP_OF+TILES]], (uint32_t *) &memory[PALETTE_REGS]);
+    mem[TOP_OF+TILES] += 0x400;
 
     // Load Pasta + Tricolore libs
     FILE * infile;
@@ -172,15 +180,18 @@ void tricolore_init() {
 // - The redraw callback
 
 void draw(int from_x, int from_y, int width, int height) {
+  // Determine tile memory using start-of registers
+  int TILE_MEM = mem[TILES];
+
   // May not need to clear screen when redrawing full background / character screen
 
   // If no hi res but screen width allows it, shift by one to get 'lo res'
   shift = !hires->value && (SCREEN_WIDTH == 32);
-  uint32_t * palette = (uint32_t *) &memory[PALETTE_MEM];
+  uint32_t * palette = (uint32_t *) &memory[PALETTE_REGS];
 
   // 16 sprite structs of size 16 = 256 bytes
   for (int s =0; s<16; s++) {
-    Sprite * sprite = (Sprite *) &memory[SPRITE_MEM + (16 * s)];
+    Sprite * sprite = (Sprite *) &memory[SPRITE_REGS + (16 * s)];
     int transparent = sprite->flags & 0x0F;
     int scalex = ((sprite->flags >> 4) & 0b11)+1; // Can scale 2,3,4 times; maybe rather 2,4,8?
     int scaley = ((sprite->flags >> 6) & 0b11)+1;
