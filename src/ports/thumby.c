@@ -1,6 +1,8 @@
 #include <stdint.h>
 #include <string.h>
 #include <malloc.h>
+#include <unistd.h>
+
 #include "pico/stdlib.h"
 #include "hardware/pwm.h"
 #include "hardware/clocks.h"
@@ -193,7 +195,6 @@ void thumby_init() {
     beep(660, 100);
 
     getchar(); // await first input on serial
-
     cls();
 }
 
@@ -224,6 +225,7 @@ FILE * open_file (const char * filename, const char * mode) {
 // Entry point for the Thumby port
 int main (int argc, char ** argv) {
     stdio_init_all();
+
     pasta_init();
     thumby_init();
     register_thumby_prims();

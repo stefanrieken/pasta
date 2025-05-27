@@ -1,5 +1,5 @@
-CFLAGS=-Wall -Wunused -ffunction-sections -fdata-sections -DLEXICAL_SCOPING
-OBJS=src/stack.o src/base.o src/int.o src/pasta.o src/file.o
+CFLAGS=-Wall -Wunused -ffunction-sections -fdata-sections -DANSI_TERM -DLEXICAL_SCOPING
+OBJS=src/stack.o src/base.o src/int.o src/pasta.o src/terminal.o src/file.o
 
 EMBEDDEDS=assets/ascii1.bmp.obj assets/ascii2.bmp.obj recipes/lib.pasta.obj recipes/lib.trico.obj
 
@@ -31,16 +31,16 @@ tricolore: $(OBJS) src/bitmap.o src/tricolore.o src/ports/gtk_cairo.o
 rp2040: rp2040/Makefile src/*.c src/ports/thumby.c $(EMBEDDEDS)
 	cd rp2040 && make bianco
 
-rp2040/Makefile:
+rp2040/Makefile: CMakeLists.txt
 	mkdir -p rp2040
 	cd rp2040 && cmake .. -DPICO_PLATFORM=rp2040
 
 rp2350: rp2350/Makefile $(OBJS) src/*.c src/ports/thumby_color.c $(EMBEDDEDS)
 	cd rp2350 && make tricolore
 
-rp2350/Makefile:
+rp2350/Makefile: CMakeLists.txt
 	mkdir -p rp2350
 	cd rp2350 && cmake .. -DPICO_PLATFORM=rp2350
 
 clean:
-	rm -rf src/*.o pasta tricolore rp2040 rp2350 assets/*.obj recipes/*.obj
+	rm -rf src/*.o src/ports/*.o pasta tricolore rp2040 rp2350 assets/*.obj recipes/*.obj

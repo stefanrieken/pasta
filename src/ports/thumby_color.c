@@ -1,6 +1,8 @@
 #include <stdint.h>
 #include <string.h>
 #include <malloc.h>
+#include <unistd.h>
+
 #include "pico/stdlib.h"
 #include "hardware/pwm.h"
 #include "hardware/clocks.h"
@@ -176,7 +178,9 @@ void thumby_color_init() {
 }
 
 int main (int argc, char ** argv) {
+
     stdio_init_all();
+
     thumby_color_init();
     pasta_init();
     tricolore_init();

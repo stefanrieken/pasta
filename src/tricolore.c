@@ -126,7 +126,7 @@ void register_display_prims() {
     pointer_y = add_variable("pointer_y", 0);
     click = add_variable("click", 0);
     hires = add_variable("hires", 0);
-  shift = !hires->value && (SCREEN_WIDTH == 32);
+    shift = !hires->value && (SCREEN_WIDTH == 32);
     add_variable("write", add_primitive(group | PRIM_WRITE));
     add_variable("draw", add_primitive(group | PRIM_DRAW));
     add_variable("catchup", add_primitive(group | PRIM_CATCHUP));
@@ -239,7 +239,11 @@ void draw(int from_x, int from_y, int width, int height) {
 
           if (!(transparent & (1 << pxdata))) {
               int color = (sprite->colors >> ((pxdata ^ colormask) *4)) & 0b1111;
-              set_pixel((((sprite->x<<shift)+j)%(8*SCREEN_WIDTH<<shift)), (((sprite->y<<shift)+i)%(8*SCREEN_HEIGHT<<shift)), palette[color]); // The % allows for rotation
+              
+              // TODO: introduce sprite flags rotate_x and rotate_y.
+              // If 1, take the modulo of x / y as below to draw the otherwise cut off part of the sprite at left / on top
+              // If 0, don't draw pixel out of boundaries (assume set_pixel implementations already guard against this?)
+              set_pixel(((((sprite->x)<<shift)+j)%(8*SCREEN_WIDTH)), (((sprite->y<<shift)+i)%(8*SCREEN_HEIGHT)), palette[color]); // The % allows for rotation
           }
         }
       }

@@ -5,6 +5,7 @@
 #include <stdbool.h>
 #include <unistd.h>
 
+#include "terminal.h"
 #include "pasta.h"
 #include "stack.h"
 #include "base.h"
@@ -24,17 +25,19 @@ uint8_t prim_group_len;
 #define MAX_PRIM_GROUPS 8
 PrimGroupCb prim_groups[MAX_PRIM_GROUPS];
 
-#ifdef PICO_SDK
-
-int getch(FILE * file) {
-    int ch = fgetc(file);
-    if (ch == '\r') ch = '\n'; // \r is EOL in serial terminal
-    if (isatty(fileno(file))) printf("%c", ch);
-    return ch;
-}
+int read_char(FILE * file) {
+    int result;
+#ifdef ANSI_TERM
+    result = isatty(fileno(file)) ? getch() : fgetc(file);
 #else
-#define getch fgetc
+    result = fgetc(file);
+#ifdef PICO_SDK
+    if (result == '\r') result = '\n'; // \r is EOL in serial terminal#endif
+    if (isatty(fileno(file))) printf("%c", result);
 #endif
+#endif
+  return result;
+}
 
 /** 
  * Find string in unique string list, or add it.
@@ -181,8 +184,8 @@ bool is_whitespace_char(int ch) {
     return ch == ' ' || ch == '\t' || ch == '\r' || ch == '\n';
 }
 int next_non_whitespace_char(FILE * infile, int until) {
-    int ch = getch(infile);
-    while (ch != EOF && ch != until && is_whitespace_char(ch)) ch = getch(infile);
+    int ch = read_char(infile);
+    while (ch != EOF && ch != until && is_whitespace_char(ch)) ch = read_char(infile);
     return ch;
 }
 
@@ -340,7 +343,7 @@ int parse_int(FILE * infile, int ch, int * result, int radix) {
     else if (ch >= 'A' && ch <= 'Z') normalized = '0'+10+(ch-'A');
     while(normalized >= '0' && normalized <= '0'+radix) {
         *result = (*result * radix) + (normalized-'0');
-        ch = getch(infile);
+        ch = read_char(infile);
         normalized = ch;
         if (ch >= 'a' && ch <= 'z') normalized = '0'+10+(ch-'a');
         else if (ch >= 'A' && ch <= 'Z') normalized = '0'+10+(ch-'A');
@@ -375,15 +378,15 @@ void parse(FILE * infile, bool repl) {
     while (ch != EOF) {
         if (ch == '#') {
             // skip comments
-            do { ch = getch(infile); } while (ch != '\n');
+            do { ch = read_char(infile); } while (ch != '\n');
         }
 
         if (ch >='0' && ch <= '9') {
             int radix = 10;
             if (ch == '0') {
-                ch = getch(infile);
-                if(ch == 'b') { radix = 2; ch = getch(infile); }
-                else if(ch == 'x') { radix = 16; ch = getch(infile); }
+                ch = read_char(infile);
+                if(ch == 'b') { radix = 2; ch = read_char(infile); }
+                else if(ch == 'x') { radix = 16; ch = read_char(infile); }
             }
             int result = 0;
             ch = parse_int(infile, ch, &result, radix);
@@ -393,13 +396,13 @@ void parse(FILE * infile, bool repl) {
             if (!is_whitespace_char(ch) || (countstack.length == 1 && ch == '\n')) continue; // so that superfluous 'ch' is processed in next round
         } else if (ch=='\"') {
             int i = 0;
-            ch = getch(infile);
+            ch = read_char(infile);
             while (ch != '\"') {
                 if (ch == '\\') {
-                    ch = getch(infile);
+                    ch = read_char(infile);
                     if (ch == 'x') {
                         int result = 0;
-                        ch = parse_int(infile, getch(infile), &result, 16);
+                        ch = parse_int(infile, read_char(infile), &result, 16);
                         buffer[i++] = result;
                         continue;
                     }
@@ -409,7 +412,7 @@ void parse(FILE * infile, bool repl) {
                     }
                 }
                 buffer[i++] = ch;
-                ch = getch(infile);
+                ch = read_char(infile);
             }
             buffer[i++] = 0;
             add_command(CMD_PUSH, unique_string(buffer));
@@ -465,7 +468,7 @@ void parse(FILE * infile, bool repl) {
         } else if (!is_whitespace_char(ch)) {
             // printf("Label\n");
             int i=0;
-            while (ch != EOF && !is_whitespace_char(ch) && !is_bracket_char(ch) && ch != ';') { buffer[i++] = ch; ch = getch(infile); }
+            while (ch != EOF && !is_whitespace_char(ch) && !is_bracket_char(ch) && ch != ';') { buffer[i++] = ch; ch = read_char(infile); }
             buffer[i++] = 0;
             //printf("Label is: '%s'\n", buffer);
             add_command(CMD_REF, unique_string(buffer));
@@ -557,14 +560,30 @@ void * mainloop(void * arg) {
 
     // Allow interactive running even after file args using "-"
     if (i == 0 || (args[i] != NULL && strcmp(args[i], "-") == 0)) {
-/*
-        if (isatty(fileno(stdin))) {
-            strings();
-            ls();
+#ifdef ANSI_TERM
+        if (isatty(fileno(stdin))) init_terminal();
+#endif /* ANSI_TERM */
+
+#ifdef PICO_SDK
+        // On embedded situations, cycle over reading from stdin.
+        // Ideally, something like this should allow us to disconnect using ^D
+        // and then initiate a fresh connection later. In practice clients don't
+        // seem compelled to hang up on just a ^D.
+        while(1) {
+#endif
+            parse(stdin, true);
+#ifdef PICO_SDK
+            clearerr(stdin);
+            reset_buffer();
         }
-*/
-        parse(stdin, true);
+#endif
+
+#ifdef ANSI_TERM
+        if (isatty(fileno(stdin))) reset_terminal();
+#endif /* ANSI_TERM */
+
     }
+
     return NULL;
 }
 

@@ -2,10 +2,11 @@ cmake_minimum_required(VERSION 3.13)
 
 include(../pico-sdk/pico_sdk_init.cmake)
 add_compile_definitions(PICO_SDK)
+add_compile_definitions(ANSI_TERM)
 pico_sdk_init()
 
 project(bianco)
-add_executable(bianco src/pasta.c src/stack.c src/base.c src/int.c src/chef.c src/ports/thumby.c src/ssd1306.c)
+add_executable(bianco src/terminal.c src/pasta.c src/stack.c src/base.c src/int.c src/file.c src/ports/thumby.c src/ssd1306.c)
 target_link_libraries(bianco pico_stdlib hardware_pwm hardware_spi ${CMAKE_CURRENT_SOURCE_DIR}/recipes/lib.pasta.obj)
 pico_enable_stdio_usb(bianco 1)
 pico_enable_stdio_uart(bianco 0)
@@ -13,7 +14,7 @@ pico_enable_stdio_uart(bianco 0)
 pico_add_extra_outputs(bianco)
 
 project(tricolore)
-add_executable(tricolore src/pasta.c src/stack.c src/base.c src/int.c src/chef.c src/bitmap.c src/tricolore.c src/ports/thumby_color.c src/gc9107.c)
+add_executable(tricolore src/terminal.c src/pasta.c src/stack.c src/base.c src/int.c src/file.c src/bitmap.c src/tricolore.c src/ports/thumby_color.c src/gc9107.c)
 target_link_libraries(
         tricolore
         pico_stdlib hardware_pwm hardware_spi hardware_pio hardware_gpio hardware_dma
