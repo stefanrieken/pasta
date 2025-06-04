@@ -82,6 +82,9 @@ void beep(int frequency, int duration) {
 #define BTN_DPAD_D 3
 #define BTN_B 21
 #define BTN_A 25
+#define BTN_MENU 26
+#define BTN_BUMP_L 6
+#define BTN_BUMP_R 22
 
 void setup_button(int gpio) {
     gpio_init(gpio);
@@ -89,7 +92,7 @@ void setup_button(int gpio) {
     gpio_set_dir(gpio, GPIO_IN);
 }
 
-void get_button_state() {
+bool update_inputs() {
     direction->value = 0;
     // active low
     if (!gpio_get(BTN_DPAD_L)) direction->value = ((direction->value & PLANE_VERT) | DIR_LEFT);
@@ -99,11 +102,21 @@ void get_button_state() {
 
     if (!gpio_get(BTN_A)) beep(440, 100);
     if (!gpio_get(BTN_B)) beep(660, 100);
+
+    if (!gpio_get(BTN_BUMP_L)) beep(440, 100);
+    if (!gpio_get(BTN_BUMP_R)) beep(660, 100);
+
+    if (/*!gpio_get(BTN_MENU) &&*/ stdio_getchar_timeout_us(0) != PICO_ERROR_TIMEOUT) {
+        return false; // make any screen ("catchup") loop fall through so as to continue to REPL
+    }
+    return true;
 }
 
 // These are linker symbols. Rather than pointing to memory containing a value,
 // their 'address' itself is the value. Their type is kind of bogus, but makes
 // the C compiler happy.
+extern void * _binary_hello_ram_start;
+extern void * _binary_hello_ram_size;
 extern void * _binary_recipes_lib_pasta_start;
 extern void * _binary_recipes_lib_pasta_size;
 extern void * _binary_recipes_lib_trico_start;
@@ -115,6 +128,9 @@ extern void * _binary_assets_ascii2_bmp_size;
 
 // Opens only known, linked files
 FILE * open_file (const char * filename, const char * mode) {
+    if (strcmp("rom.ram", filename) == 0) {
+        return fmemopen((void *) &_binary_hello_ram_start, (ptrdiff_t) &_binary_hello_ram_size, mode);
+    }
     if (strcmp("recipes/lib.pasta", filename) == 0) {
         return fmemopen((void *) &_binary_recipes_lib_pasta_start, (ptrdiff_t) &_binary_recipes_lib_pasta_size, mode);
     }
@@ -169,12 +185,13 @@ void thumby_color_init() {
     setup_button(BTN_DPAD_D);
     setup_button(BTN_A);
     setup_button(BTN_B);
+    setup_button(BTN_MENU);
+    setup_button(BTN_BUMP_L);
+    setup_button(BTN_BUMP_R);
 
     // Play a starting melody :)
     beep(440, 100);
     beep(660, 100);
-
-    getchar(); // await first input on serial
 }
 
 int main (int argc, char ** argv) {

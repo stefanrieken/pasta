@@ -8,9 +8,7 @@ enum {
     PRIM_LOAD
 };
 
-void save(char * filename, uint8_t bitmap, uint8_t append) {
-    FILE * file = fopen(filename, "w");
-
+void save(FILE * file, uint8_t bitmap, uint8_t append) {
     // write start-of / top-of registers first
     for (int i=0; i< 8; i++) {
         if ((bitmap & (1 << i)) != 0) {
@@ -46,13 +44,9 @@ void save(char * filename, uint8_t bitmap, uint8_t append) {
             }
         }
     }
-    
-    fclose(file);
 }
 
-void load(char * filename, uint8_t bitmap, uint8_t append) {
-    FILE * file = open_file(filename, "r");
-
+void load(FILE * file, uint8_t bitmap, uint8_t append) {
     uint16_t from[8];
     uint16_t to[8];
     // temp read offset registers first
@@ -82,13 +76,12 @@ void load(char * filename, uint8_t bitmap, uint8_t append) {
             memory[j] = fgetc(file);
         }
     }
-
-    fclose(file);
 }
 
 uint16_t file_prim_group_cb(uint8_t prim) {
     uint16_t n = peek(&argstack);
     char * filename;
+    FILE * file;
     uint8_t index, bitmap = 0, append = 0;
     uint16_t result = 0;
 
@@ -101,7 +94,10 @@ uint16_t file_prim_group_cb(uint8_t prim) {
                 if (index & 0b01) append |= 1 << (index >> 1);
             }
             if (bitmap == 0) bitmap = 0b11111111; // default: write all
-            save(filename, bitmap, append);
+            file = open_file(filename, "w");
+            if (file == NULL) { printf("Error opening file: %s\n", filename); return 0; }
+            save(file, bitmap, append);
+            fclose(file);
             result = 0;
             break;
         case PRIM_LOAD:
@@ -111,7 +107,11 @@ uint16_t file_prim_group_cb(uint8_t prim) {
                 bitmap |= 1 << (index >> 1); // 2-byte offset
                 if (index & 0b01) append |= 1 << (index >> 1);
             }
-            load(filename, bitmap, append);
+            file = open_file(filename, "r");
+            if (file == NULL) { printf("Error opening file: %s\n", filename); return 0; }
+            load(file, bitmap, append);
+            fclose(file);
+            refresh();
             result = 0;
             break;
     }
@@ -124,6 +124,8 @@ uint16_t file_prim_group_cb(uint8_t prim) {
 void register_file_prims() {
     uint8_t group = add_primitive_group(file_prim_group_cb);
     add_variable("save", add_primitive(group | PRIM_SAVE));
+    // TODO: when "load" overwrites code, its closing 'EVAL 0' cleanup command gets overwritten as well,
+    // giving undefined effects.
     add_variable("load", add_primitive(group | PRIM_LOAD));
 }
 

@@ -1,5 +1,5 @@
 // Sprite registers (not to be confused with sprite data memory)
-#define SPRITE_REGS 0x0200
+#define SPRITE_REGS 0x0100
 // Palette
 #define PALETTE_REGS 0x00C0
 
@@ -58,6 +58,8 @@ extern int SCREEN_HEIGHT;
 // Non-screen functions expected to exist on the Tricolore platform as well
 void beep(int frequency, int duration);
 
-#ifdef PICO_SDK
-void get_button_state();
-#endif
+//
+// Callbacks for which Pasta expects an implementation
+//
+bool update_inputs(); // updates button state; returns whether there's input on stdin (halts catchup loops)
+

@@ -120,7 +120,7 @@ Variable * add_variable(char * name, uint16_t value) {
     return add_var(unique_string(name), value);
 }
 
-Variable * lookup_variable(uint16_t name) {
+Variable * quiet_lookup_variable(uint16_t name) {
     for (int i=mem[TOP_OF+VARS]-sizeof(Variable);i>=mem[VARS];i-=sizeof(Variable)) {
         Variable * var = (Variable *) &memory[i];
 
@@ -133,6 +133,13 @@ Variable * lookup_variable(uint16_t name) {
 
         if(var->name == name) return var;
     }
+    return NULL;
+}
+
+Variable * lookup_variable(uint16_t name) {
+    Variable * var = quiet_lookup_variable(name);
+    if (var != NULL) return var;
+
     // Not found
     if (name >= mem[STRINGS] && name < mem[END_OF+STRINGS]) {
         printf("Var not found: %s\n", (char *) (&memory[name])); // may reasonably assume name string ref is ok
@@ -231,7 +238,7 @@ void run_func(uint16_t func) {
 #endif
 
     // Avoid interpreting zeroes and other random (but hopefully low) functions
-    if (func < mem[CODE]) { printf("Invalid function reference.\n"); return; }
+    if (func < mem[CODE] || func > mem[TOP_OF+CODE]) { printf("Invalid function reference.\n"); return; }
     uint8_t type = memory[func];
     uint16_t num_args = peek(&argstack);
     uint16_t result = 0;
@@ -239,6 +246,8 @@ void run_func(uint16_t func) {
     if (type == 0) { // signals primitive func
         uint8_t prim = memory[func+1];
         uint8_t group = (prim >> 5) & 0b111;
+        // Final sanity check
+        if (prim_groups[group] == NULL) { printf("Primitive %d.%d not found\n", group, prim & 0b11111); return; }
         // invoke primitive group callback
         result = prim_groups[group](prim & 0b11111);
     } else {
@@ -545,24 +554,65 @@ void pasta_init() {
     }
 }
 
+bool do_repl;
+
+// Either run argument file(s), REPL, or both.
 void * mainloop(void * arg) {
     char ** args = (char **) arg;
 
     int i = 0;
     FILE * infile;
-    // Pasta lib should already be loaded at this point
 
-    while (args != NULL && args[i] != NULL && strcmp(args[i], "-") != 0) {
-        infile = fopen(args[i++], "r");
-        parse(infile, true);
-        fclose(infile);
+    do_repl = true;
+
+    if (args == NULL || args[i] == NULL || strcmp(args[i], "-") == 0) {
+        // Load in a default rom.ram file
+        // Base libs are already loaded at this point, if found;
+        // In practice you would use either the libs, or the rom.ram file.
+        if ((infile = open_file("rom.ram", "r"))) {
+            //printf("Running from rom.ram\n");
+            load(infile, 0xFF, 0xFF);
+            fclose(infile);
+            refresh();
+        }// else printf("No rom.ram found\n");
     }
 
-    // Allow interactive running even after file args using "-"
-    if (i == 0 || (args[i] != NULL && strcmp(args[i], "-") == 0)) {
+    while (args != NULL && args[i] != NULL && strcmp(args[i], "-") != 0) {
+        char * filename = args[i++];
+
+        if ((infile = open_file(filename, "r"))) {
+            if (strcmp(strrchr(filename, '.'), ".ram") == 0) {
+                load(infile, 0xFF, 0xFF);
+                refresh();
+            }
+            else parse(infile, true);
+
+            fclose(infile);
+        } else {
+            printf("Error opening file: %s\n", filename);
+        }
+    }
+
 #ifdef ANSI_TERM
         if (isatty(fileno(stdin))) init_terminal();
 #endif /* ANSI_TERM */
+
+    // Try to autorun if no "-" arg detected
+    if ((args == NULL || args[i] == NULL)) {
+        //printf("Trying to autorun\n");
+        Variable * var = quiet_lookup_variable(unique_string("run"));
+        if (var != NULL) {
+            if (args != NULL && args[i] == NULL) do_repl = false; // Signal not to default to repl after autorun
+            //printf("Running run func\n");
+            push(&argstack, var->value);
+            push(&argstack, 1);
+            run_func(var->value);
+            argstack.length = 0;
+        }
+    }
+
+    // Allow interactive running even after file args using "-"
+    if (do_repl) {
 
 #ifdef PICO_SDK
         // On embedded situations, cycle over reading from stdin.
@@ -577,12 +627,10 @@ void * mainloop(void * arg) {
             reset_buffer();
         }
 #endif
-
+    }
 #ifdef ANSI_TERM
         if (isatty(fileno(stdin))) reset_terminal();
 #endif /* ANSI_TERM */
-
-    }
 
     return NULL;
 }

@@ -1,5 +1,5 @@
 #include <stdbool.h>
-
+#include <poll.h>
 #include <gtk/gtk.h>
 
 #include "../pasta.h"
@@ -19,6 +19,8 @@ GtkWidget * drawing_area;
 
 uint8_t * pixels;
 int rowstride;
+
+struct pollfd poll_stdin;
 
 bool delete_cb(GtkWidget *widget, GdkEventType *event, gpointer userdata) {
   // destroy any global drawing state here,
@@ -116,6 +118,21 @@ void button_cb(GtkWidget *widget, GdkEventButton * event, gpointer userdata) {
     }
 }
 
+bool update_inputs() {
+    // Input states are updated by the callbacks above
+
+    // Only thing left is to check for activity on stdin
+    // TODO it would be nice NOT to break on stdin if we
+    // can detect that no "-" argument was given, as it
+    // practically freezes the screen without offering a
+    // command line as an alternative.
+    if (do_repl && poll(&poll_stdin, 1, 0) != 0) {
+        getchar(); // dismiss the character that breaks the run loop
+        return false; // make any screen ("catchup") loop fall through so as to continue to REPL
+    }
+    return true;
+}
+
 void display_init(int argc, char ** argv) {
 
   gtk_init (&argc, &argv);
@@ -124,6 +141,7 @@ void display_init(int argc, char ** argv) {
   gtk_window_set_title(window, "tricolore on Cairo");
   gtk_window_set_default_size(window, SCREEN_WIDTH*8*SCALE, SCREEN_HEIGHT*8*SCALE);
   gtk_window_set_resizable(window, FALSE);
+//  gtk_window_set_hide_on_close(window, TRUE);
 
   drawing_area = gtk_drawing_area_new();
   gtk_widget_set_size_request(drawing_area, SCREEN_WIDTH*8*SCALE, SCREEN_HEIGHT*8*SCALE);
@@ -147,6 +165,9 @@ void display_init(int argc, char ** argv) {
 
   rowstride = cairo_image_surface_get_stride(surface);
   pixels = cairo_image_surface_get_data(surface); // probably want to renew this after every commplete draw
+
+  poll_stdin.fd = fileno(stdin);
+  poll_stdin.events = POLLIN;
 }
 
 void redraw(int from_x, int from_y, int width, int height) {
@@ -169,17 +190,14 @@ FILE * open_file (const char * filename, const char * mode) {
   return fopen(filename, mode);
 }
 
-void beep(int frequency, int duration) {
-    // alas, not yet supported
-//    gdk_display_beep(gdk_display_get_default());
-//    usleep((duration + (duration / 2)) *  1000);
-}
+extern void init_sdl_audio();
 
 // Entry point for the GTK / Cairo port
 int main (int argc, char ** argv) {
     pasta_init();
     tricolore_init();
     display_init(argc, argv);
+    init_sdl_audio();
 
     pthread_t worker_thread;
     pthread_create(&worker_thread, NULL, mainloop, &argv[1]);

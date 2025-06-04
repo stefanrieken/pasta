@@ -36,7 +36,6 @@ void set_input_unbuffered_no_echo() {
 static char buffer[1024];
 static int idx, max;
 static int saved_first_char;
-static bool just_restored_buffer;
 
 void reset_buffer() {
     if (idx > 0) saved_first_char = buffer[0];
@@ -72,7 +71,6 @@ void readline() {
             idx = strlen(buffer);
             max = idx;
             printf("%s", buffer);
-            just_restored_buffer = true;
           }
         } else if (ch == 'B') {
           // Arrow down: reset buffer
@@ -129,7 +127,6 @@ void init_terminal() {
     set_input_unbuffered_no_echo();
     reset_buffer();
     saved_first_char = -1;
-    just_restored_buffer = false;
 }
 
 void reset_terminal() {

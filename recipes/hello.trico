@@ -1,4 +1,5 @@
 # Assumes lib.trico is loaded
+# Interpreter can autorun "run" function
 
 define "cursor" (write screen "\x7FTricolore\n\n")
 add "cursor" 1;
@@ -15,11 +16,15 @@ loop {
 
 # Add a sprite
 define "sprite1" (sprite 1)
-define "tile1" (* 31 1024)
+define "tile1" (+ screen 256)
 setallb sprite1 112 0 1 1 (lsb tile1) (msb tile1) 0 0x01 0x10 0x30 # set scale = 2x on both axes + set first color to be transparent
 setb tile1 21
 
-draw;
+# Also register the single tile for sprite1 for saving;
+# Sprite memory register is section 6; top-of registers are from byte 16
+setw (+ 16 12) (+ tile1 1)
+
+draw
 
 #bitfield "north" "east" "south" "west";
 
@@ -34,9 +39,11 @@ define "pxtouches" {
     getb map tile
 };
 
-define "catwalk" {
+define "run" {
     define "diffx"  0;
     define "diffy"  0;
+
+    draw;
 
     loop {
         # X pos
@@ -124,6 +131,5 @@ define "catwalk" {
 
         catchup
     }
-};
+}
 
-catwalk

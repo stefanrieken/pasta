@@ -33,8 +33,9 @@ Tricolore is 80's chic:
 ## Building, running and examples
 Plain Pasta should build on a regular (Posix) C compiler.
 
-For the Tricolore build to succeed, you also need the GTK headers and libs.
-On a Mac using homebrew, run `brew install gtk+ pkg-config`.
+For the Tricolore build to succeed, you also need the GTK headers and libs,
+as well as libsdl2 (presently only used for sound).
+On a Mac using homebrew, run `brew install gtk+ pkg-config sdl2`.
 
 Next, typing 'make' should produce 2 local executables:
 - `pasta` is the core interpreter

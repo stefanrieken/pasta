@@ -14,6 +14,7 @@ typedef struct __attribute__((__packed__)) Variable {
 Variable * add_variable(char * name, uint16_t value);
 Variable * add_var(uint16_t name, uint16_t value);
 uint16_t set_var(uint16_t name, uint16_t value);
+Variable * quiet_lookup_variable(uint16_t name);
 Variable * lookup_variable(uint16_t name);
 
 void parse(FILE * infile, bool repl);
@@ -60,7 +61,16 @@ enum {
 FILE * open_file (const char * filename, const char * mode);
 
 //
-// Callbacks
+// Init / run function
 //
 void pasta_init();
 void * mainloop(void * arg);
+
+// Signals that mainloop intends to fall back to repl after run loop.
+// Can be used to fine-tune such behaviour as halting run loop on stin.
+extern bool do_repl;
+
+//
+// Callbacks for which Pasta expects an implementation
+//
+extern void refresh(); // Trigger state refreshes, think redrawing a screen after loading a binary

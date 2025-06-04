@@ -94,10 +94,9 @@ uint16_t disp_prim_group_cb(uint8_t prim) {
             } while(this_time.tv_sec == last_time.tv_sec && (this_time.tv_nsec >> 24) == (last_time.tv_nsec >> 24));
             last_time = this_time;
 #else
-            get_button_state();
 //            sleep_us(5000);
 #endif
-            result = screen_active;
+            result = screen_active && update_inputs();
             break;
         case PRIM_SAVE_SHEET:
             // Utility function specific to the editor
@@ -146,8 +145,8 @@ void tricolore_init() {
     mem[TILES] = 0x6000;
     mem[SCREEN] = 0x7800;
 
-    mem[TOP_OF+TILES] = mem[TILES];
-    mem[TOP_OF+SCREEN] = mem[SCREEN];
+    mem[TOP_OF+TILES] = mem[TILES]; // but see below
+    mem[TOP_OF+SCREEN] = mem[SCREEN]+0x0100; // Secure at least the 16x16 screen
 
     register_display_prims();
 
@@ -251,4 +250,8 @@ void draw(int from_x, int from_y, int width, int height) {
   }
 
   redraw(from_x<<shift, from_y<<shift, width<<shift, height<<shift);
+}
+
+void refresh() {
+    draw(0, 0, SCREEN_WIDTH*8, SCREEN_HEIGHT*8);
 }

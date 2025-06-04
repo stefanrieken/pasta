@@ -9,7 +9,7 @@ enum "xpos" "ypos" "width" "height" "map0" "map1" "tileset" "flags" "colors0" "c
 # returns sprite struct n
 define "sprite" {
     args "n";
-    + 0x0200 (* n 16)
+    + 0x0100 (* n 16)
 }
 
 # Load base ascii / spritesets into memory (may be builtin)

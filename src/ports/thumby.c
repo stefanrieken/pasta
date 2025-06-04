@@ -81,9 +81,7 @@ void setup_button(int gpio) {
     gpio_set_dir(gpio, GPIO_IN);
 }
 
-// We don't presently have a 'direction' variable setup as in Tricolore
-// FOr now, settle for making a beep sound
-void get_button_state() {
+bool update_inputs() {
     direction->value = 0;
     // active low
     if (!gpio_get(BTN_DPAD_L)) direction->value = ((direction->value & PLANE_VERT) | DIR_LEFT);
@@ -93,7 +91,11 @@ void get_button_state() {
 
     if (!gpio_get(BTN_A)) beep(440, 100);
     if (!gpio_get(BTN_B)) beep(660, 100);
-}
+
+    if (stdio_getchar_timeout_us(0) != PICO_ERROR_TIMEOUT) {
+        return false; // make any screen ("catchup") loop fall through so as to continue to REPL
+    }
+    return true;}
 
 
 // As the screen is arranged in column bytes,
@@ -131,9 +133,8 @@ uint16_t thumby_prim_group_cb(uint8_t prim) {
 
     switch(prim) {
         case PRIM_CATCHUP:
-            get_button_state();
 //            sleep_us(10000);
-            result = 1; // allows catchup as loop result
+            result = update_inputs();
             break;
         case PRIM_WRITE:;
             if (n < 3) return 0;
@@ -158,6 +159,10 @@ uint16_t thumby_prim_group_cb(uint8_t prim) {
     }
 
     return result;
+}
+
+void refresh() {
+    display_write_buffer(&memory[TILE_MEM], 72*40 / 8);
 }
 
 void thumby_init() {
@@ -194,7 +199,7 @@ void thumby_init() {
     beep(440, 100);
     beep(660, 100);
 
-    getchar(); // await first input on serial
+    getchar(); // Since the current Thumby build doesn't autorun a program, await first input on serial
     cls();
 }
 

@@ -3,6 +3,7 @@ cmake_minimum_required(VERSION 3.13)
 include(../pico-sdk/pico_sdk_init.cmake)
 add_compile_definitions(PICO_SDK)
 add_compile_definitions(ANSI_TERM)
+add_compile_definitions(LEXICAL_SCOPING)
 pico_sdk_init()
 
 project(bianco)
@@ -18,6 +19,7 @@ add_executable(tricolore src/terminal.c src/pasta.c src/stack.c src/base.c src/i
 target_link_libraries(
         tricolore
         pico_stdlib hardware_pwm hardware_spi hardware_pio hardware_gpio hardware_dma
+        ${CMAKE_CURRENT_SOURCE_DIR}/hello.ram.obj
         ${CMAKE_CURRENT_SOURCE_DIR}/recipes/lib.pasta.obj
         ${CMAKE_CURRENT_SOURCE_DIR}/recipes/lib.trico.obj
         ${CMAKE_CURRENT_SOURCE_DIR}/assets/ascii1.bmp.obj
