@@ -4,7 +4,7 @@ OBJS=src/stack.o src/base.o src/int.o src/pasta.o src/terminal.o src/file.o
 EMBEDDEDS=hello.ram.obj assets/ascii1.bmp.obj assets/ascii2.bmp.obj recipes/lib.pasta.obj recipes/lib.trico.obj
 
 %.o: %.c
-	$(CC) $(CFLAGS) -c $< -o $@ `pkg-config --cflags cairo gdk-3.0 gtk+-3.0 libpng`
+	$(CC) $(CFLAGS) -c $< -o $@ `pkg-config --cflags cairo gdk-3.0 gtk+-3.0 sdl2`
 
 all: pasta tricolore
 
@@ -20,8 +20,11 @@ lib.ram:
 pasta: $(OBJS) src/main.o
 	$(CC) $(CFLAGS) $^ -o $@
 
-tricolore: $(OBJS) src/bitmap.o src/tricolore.o src/ports/gtk_cairo.o src/ports/sdl.o
-	$(CC) $(CFLAGS) $^ -o $@ `pkg-config --libs cairo gdk-3.0 gtk+-3.0 libpng` -lSDL2
+tricolore: $(OBJS) src/bitmap.o src/tricolore.o src/ports/sdl.o
+	$(CC) $(CFLAGS) $^ -o $@ `pkg-config --libs sdl2`
+
+tricolore_gtk: $(OBJS) src/bitmap.o src/tricolore.o src/ports/gtk_cairo.o
+	$(CC) $(CFLAGS) $^ -o $@ `pkg-config --libs cairo gdk-3.0 gtk+-3.0`
 
 # Use e.g. objdump -t assets/ascii1.bmp.obj
 # to see the symbols ld has setup for each binary
@@ -44,4 +47,4 @@ rp2350/Makefile: CMakeLists.txt
 	cd rp2350 && cmake .. -DPICO_PLATFORM=rp2350 -DPICOTOOL_FETCH_FROM_GIT_PATH=$(realpath ../picotool)
 
 clean:
-	rm -rf src/*.o src/ports/*.o pasta tricolore rp2040 rp2350 assets/*.obj recipes/*.obj
+	rm -rf src/*.o src/ports/*.o pasta tricolore tricolore_gtk rp2040 rp2350 assets/*.obj recipes/*.obj

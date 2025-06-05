@@ -33,9 +33,9 @@ Tricolore is 80's chic:
 ## Building, running and examples
 Plain Pasta should build on a regular (Posix) C compiler.
 
-For the Tricolore build to succeed, you also need the GTK headers and libs,
-as well as libsdl2 (presently only used for sound).
-On a Mac using homebrew, run `brew install gtk+ pkg-config sdl2`.
+For the Tricolore build to succeed, you also need the SDL2 headers and libs.
+The legacy GTK based build needs GTK+3 instead, and lacks audio support.
+On a Mac using homebrew, run `brew install pkg-config sdl2 gtk+3`.
 
 Next, typing 'make' should produce 2 local executables:
 - `pasta` is the core interpreter
@@ -43,28 +43,32 @@ Next, typing 'make' should produce 2 local executables:
 
 Both accept file arguments. Examples for various features are found under
 [recipes](recipes/). Add a final '-' argument to enter the REPL after running a
-file.
+file. And if a script features a function named `run`, this function will
+automatically execute, unless a '-' argument is specified.
 
-While the PC version of Tricolore features mouse input (and a wider screen), it
-presently still lacks audio.
+The desktop version of Tricolore features mouse input, and a 'hires' mode of
+256x256 pixels / 32x32 characters (as opposed to 128x128 / 16x16).
 
 ## For the Thumby Color
 Tricolore can be built to run on the Thumby Color. It requires a copy of the
-Pico SDK with the TinyUSB submodule to be found next to the Pasta folder.
+Pico SDK with the TinyUSB submodule to be placed alongside the Pasta folder.
 
-Type `make rp2350` to make the executables, then copy `tricolore.uf2` to your
-Thumby Color. Alongside a 'ready' message on the Thumby screen, You should now
-be able to contact your Thumby over serial. From there, press enter to initiate
-the Pasta REPL, where you can also copy / paste any relevant samples.
+Type `make rp2350` to make the executables. Presently the build involves
+launching the desktop version to make a ram image; click away the Tricolore
+screen to continue the build.
 
-(Presently Tricolore assumes a 256x256 display, which is cut off to 128x128 on
-the Thumby Color. Think of it as Pasta Tricolore Quattro Formaggi.)
+Copy the file `rp2350/tricolore.uf2` to your Thumby Color. You should be
+greeted with a startup sound, followed by a running program.
+
+You should now be able to contact your Thumby over serial. From there, press
+enter to initiate the Pasta REPL (pausing the running program), where you can
+also copy / paste any sample code.
 
 ## For the original Thumby
 Pasta **Bianco** is a minimal serving whipped up for the original Thumby. Type
 `make rp2040` to build this version, then copy `bianco.uf2` to your Thumby.
 
-Being a minimalistic subset of Tricolore functionality, the `.bianco` scripts
+Being a minimalistic subset of Tricolore functionality, any `.bianco` scripts
 can also be run in Tricolore.
 
 ## Status

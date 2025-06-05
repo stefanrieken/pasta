@@ -170,6 +170,9 @@ void display_init(int argc, char ** argv) {
   poll_stdin.events = POLLIN;
 }
 
+void beep (int frequency_hz, int duration_ms) {
+    // alas, no beep for this port
+}
 void redraw(int from_x, int from_y, int width, int height) {
   // Redraw selected area (NOTE: we actually still ignored the area selection in the sprite drawing just before!)
 //  cairo_surface_mark_dirty(surface);
@@ -190,14 +193,11 @@ FILE * open_file (const char * filename, const char * mode) {
   return fopen(filename, mode);
 }
 
-extern void init_sdl_audio();
-
 // Entry point for the GTK / Cairo port
 int main (int argc, char ** argv) {
     pasta_init();
     tricolore_init();
     display_init(argc, argv);
-    init_sdl_audio();
 
     pthread_t worker_thread;
     pthread_create(&worker_thread, NULL, mainloop, &argv[1]);
