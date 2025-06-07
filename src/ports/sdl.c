@@ -81,14 +81,21 @@ void set_pixel(int x, int y, uint32_t color) {
   pixels[pixel_idx] = color;
 }
 
+// On Haiku it is made very clear that we should not redraw
+// directly from the user thread. So, don't.
 void redraw(int from_x, int from_y, int width, int height) {
+    SDL_Event event;
+    event.type = SDL_DISPLAYEVENT;
+    SDL_PushEvent(&event);
+}
+
+void actual_redraw() {
     SDL_UpdateTexture(texture, NULL, pixels, SCREEN_WIDTH * 8 * sizeof(Uint32));
 
     SDL_RenderClear(renderer);
     SDL_RenderCopy(renderer, texture, NULL, NULL);
     SDL_RenderPresent(renderer);
 }
-
 
 void init_sdl_video() {
     SDL_CreateWindowAndRenderer(SCREEN_WIDTH * 8 * SCALE, SCREEN_HEIGHT * 8 * SCALE, 0, &window, &renderer);
@@ -222,6 +229,9 @@ int main (int argc, char ** argv) {
                 case SDL_MOUSEBUTTONUP:
                     if (event.button.button == 1) click->value = 0;
                     break;
+		case SDL_DISPLAYEVENT:
+		    actual_redraw(); // trigger actual redraw from the SDL thread
+		    break;
             }
         }
     }

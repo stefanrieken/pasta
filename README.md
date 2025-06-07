@@ -36,6 +36,7 @@ Plain Pasta should build on a regular (Posix) C compiler.
 For the Tricolore build to succeed, you also need the SDL2 headers and libs.
 The legacy GTK based build needs GTK+3 instead, and lacks audio support.
 On a Mac using homebrew, run `brew install pkg-config sdl2 gtk+3`.
+On Haiku, run `pkgman install gtk3_devel libsdl2_devel`.
 
 Next, typing 'make' should produce 2 local executables:
 - `pasta` is the core interpreter
