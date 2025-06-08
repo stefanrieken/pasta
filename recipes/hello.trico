@@ -30,7 +30,7 @@ setb tile2 21
 
 # Also register the single tile sprites for saving;
 # Sprite memory register is section 6; top-of registers are from byte 16
-setw (+ 16 12) (+ cat 1)
+setw (+ 16 12) (+ tile2 1)
 
 draw
 

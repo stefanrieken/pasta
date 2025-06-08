@@ -9,7 +9,7 @@
 #include "../tricolore.h"
 
 // This value refers to the window's 'zoom level' only
-#define SCALE 2
+#define SCALE 3
 
 int SCREEN_WIDTH=32;
 int SCREEN_HEIGHT=32;
@@ -117,9 +117,12 @@ void init_sdl() {
 void shutdown_sdl() {
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
-    // SDL exit is actually more quiet when we skip these:
+    // Crackle on close is a specific issue:
+    // https://github.com/libsdl-org/SDL/issues/9099
+    // Not enough reason to shy away from 8-bit sampling,
+    // which is good enough. Just wait for SDL 2.30.x
     SDL_CloseAudioDevice(audio_device);
-//    SDL_Quit();
+    SDL_Quit();
 }
 
 FILE * open_file (const char * filename, const char * mode) {
