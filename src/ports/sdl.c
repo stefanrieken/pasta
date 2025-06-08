@@ -118,7 +118,7 @@ void shutdown_sdl() {
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
     // SDL exit is actually more quiet when we skip these:
-//    SDL_CloseAudioDevice(audio_device);
+    SDL_CloseAudioDevice(audio_device);
 //    SDL_Quit();
 }
 

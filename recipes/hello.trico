@@ -5,6 +5,9 @@ define "cursor" (write screen "\x7FTricolore\n\n")
 add "cursor" 1;
 set "cursor" (write cursor "\x0FHello\x10, world!\n")
 
+define "picked" 0
+write (+ screen 252) ($ picked 10 4)
+
 # Do a few bricks
 add "cursor" 1; # leave a hole
 loop {
@@ -15,14 +18,19 @@ loop {
 }
 
 # Add a sprite
-define "sprite1" (sprite 1)
+define "flower" (sprite 1)
 define "tile1" (+ screen 256)
-setallb sprite1 112 0 1 1 (lsb tile1) (msb tile1) 0 0x01 0x10 0x30 # set scale = 2x on both axes + set first color to be transparent
-setb tile1 21
+setallb flower 120 16 1 1 (lsb tile1) (msb tile1) 0 0x01 0xE0 0x7F
+setb tile1 28
 
-# Also register the single tile for sprite1 for saving;
+define "cat" (sprite 2)
+define "tile2" (+ tile1 1)
+setallb cat 112 0 1 1 (lsb tile2) (msb tile2) 0 0x01 0x10 0x30 # set scale = 1x on both axes + set first color to be transparent
+setb tile2 21
+
+# Also register the single tile sprites for saving;
 # Sprite memory register is section 6; top-of registers are from byte 16
-setw (+ 16 12) (+ tile1 1)
+setw (+ 16 12) (+ cat 1)
 
 draw
 
@@ -46,6 +54,13 @@ define "run" {
     draw;
 
     loop {
+        if (&& (= (getb cat xpos) (getb flower xpos)) (= (getb cat ypos) (getb flower ypos))) {
+            beep 440 100; beep 660 100;
+            if (= (getb flower xpos) 120) { setallb flower 8 120 } { setallb flower 120 16 };
+            add "picked" 1;
+            write (+ screen 252) ($ picked 10 4)
+        };
+
         # X pos
         if (& direction 0b1100) {
             # Accelerate
@@ -69,8 +84,8 @@ define "run" {
                 add "diffy" 1 # Down
             } {
                 if (&& (= diffy 0) (||
-                    (pxtouches    (getb sprite1 xpos)    (+ (getb sprite1 ypos) 8))
-                    (pxtouches (+ (getb sprite1 xpos) 7) (+ (getb sprite1 ypos) 8))
+                    (pxtouches    (getb cat xpos)    (+ (getb cat ypos) 8))
+                    (pxtouches (+ (getb cat xpos) 7) (+ (getb cat ypos) 8))
                 ) ) {
                     set "diffy" 0xFFF6; # Jump start
                 } {
@@ -90,15 +105,15 @@ define "run" {
         # Correct overshooting of Y
         if (< diffy 0x7FFF) { # South
             loop { && (> diffy 0) (||
-                (pxtouches (+ (getb sprite1 xpos) 0) (+ (getb sprite1 ypos) (/ diffy 4) 7))
-                (pxtouches (+ (getb sprite1 xpos) 7) (+ (getb sprite1 ypos) (/ diffy 4) 7))
+                (pxtouches (+ (getb cat xpos) 0) (+ (getb cat ypos) (/ diffy 4) 7))
+                (pxtouches (+ (getb cat xpos) 7) (+ (getb cat ypos) (/ diffy 4) 7))
             ) } {
                 sub "diffy" 4
             }
         } { # North
             loop { && (> diffy 0) (||
-                (pxtouches (+ (getb sprite1 xpos) 0) (+ (getb sprite1 ypos) (/ diffy 4)))
-                (pxtouches (+ (getb sprite1 xpos) 7) (+ (getb sprite1 ypos) (/ diffy 4)))
+                (pxtouches (+ (getb cat xpos) 0) (+ (getb cat ypos) (/ diffy 4)))
+                (pxtouches (+ (getb cat xpos) 7) (+ (getb cat ypos) (/ diffy 4)))
             ) } {
                 add "diffy" 4
             }
@@ -107,15 +122,15 @@ define "run" {
         # Correct overshooting of X
         if (< diffx 0x7FFF) { # East
             loop { && (> diffx 0) (||
-                (pxtouches (+ (getb sprite1 xpos) (/ diffx 4) 7) (+ (getb sprite1 ypos) (/ diffy 4)))
-                (pxtouches (+ (getb sprite1 xpos) (/ diffx 4) 7) (+ (getb sprite1 ypos) (/ diffy 4) 7))
+                (pxtouches (+ (getb cat xpos) (/ diffx 4) 7) (+ (getb cat ypos) (/ diffy 4)))
+                (pxtouches (+ (getb cat xpos) (/ diffx 4) 7) (+ (getb cat ypos) (/ diffy 4) 7))
             ) } {
                 sub "diffx" 4
             }
         } { # West
             loop { && (> diffx 0) (||
-                (pxtouches (+ (getb sprite1 xpos) (/ diffx 4)) (+ (getb sprite1 ypos) (/ diffy 4)))
-                (pxtouches (+ (getb sprite1 xpos) (/ diffx 4)) (+ (getb sprite1 ypos) (/ diffy 4) 7))
+                (pxtouches (+ (getb cat xpos) (/ diffx 4)) (+ (getb cat ypos) (/ diffy 4)))
+                (pxtouches (+ (getb cat xpos) (/ diffx 4)) (+ (getb cat ypos) (/ diffy 4) 7))
             ) } {
                 add "diffx" 4
             }
@@ -124,8 +139,8 @@ define "run" {
         if (| (/ diffy 4) (/ diffx 4)) {
             # On 256x256, sprite coordinates rotate automatically as byte overflows
             # On 128x128, we must manually rotate the sprite at end of screen
-            setb sprite1 ypos (% (+ (getb sprite1 ypos) (/ diffy 4)) 128);
-            setb sprite1 xpos (% (+ (getb sprite1 xpos) (/ diffx 4)) 128);
+            setb cat ypos (% (+ (getb cat ypos) (/ diffy 4)) 128);
+            setb cat xpos (% (+ (getb cat xpos) (/ diffx 4)) 128);
             draw
         };
 

@@ -1,6 +1,6 @@
 # Enable hi-res mode
-set "hires" true;
-setallb screen_spr 0 0 32 32;
+#set "hires" true;
+#setallb screen_spr 0 0 32 32;
 
 define "cursor" (write screen "\x7FTricolore\n\n")
 
