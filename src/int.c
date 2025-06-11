@@ -1,6 +1,7 @@
 #include <stdint.h>
 #include <stdio.h>
 
+#include "vars.h"
 #include "pasta.h"
 
 // Base primitive defs

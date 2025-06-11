@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdint.h>
 
+#include "vars.h"
 #include "pasta.h"
 
 enum {

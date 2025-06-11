@@ -10,6 +10,7 @@
 #include "pico/stdlib.h"
 #endif
 
+#include "vars.h"
 #include "pasta.h"
 #include "tricolore.h"
 
@@ -162,6 +163,12 @@ void tricolore_init() {
     quickread_2bitmap("assets/ascii2.bmp", &memory[mem[TOP_OF+TILES]], (uint32_t *) &memory[PALETTE_REGS]);
     mem[TOP_OF+TILES] += 0x400;
 
+#ifdef ANALYZE_VARS
+    // TODO We can again call init_varstackmodel here, but it can not reproduce
+    // the model of (inactive) native functions.
+    // So this only works because the earlier loaded lib.pasta is very simple.
+    init_varstackmodel();
+#endif
     // Load Pasta + Tricolore libs
     FILE * infile;
     if ((infile = open_file("recipes/lib.trico", "rb"))) {

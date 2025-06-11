@@ -2,6 +2,7 @@
 #include <poll.h>
 #include <gtk/gtk.h>
 
+#include "../vars.h"
 #include "../pasta.h"
 #include "../tricolore.h"
 

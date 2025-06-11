@@ -2,8 +2,10 @@
 #include <stdio.h>
 
 #include "pasta.h"
+#include "vars.h"
 
 // Base primitive defs
+// NOTE: this group is almost out of space! (32 max)
 enum {
     PRIM_RETURN,
     PRIM_PRINT,
@@ -16,6 +18,8 @@ enum {
     PRIM_LOOP,
     PRIM_DEFINE,
     PRIM_SET,
+    PRIM_GET,
+    PRIM_GET_AT,
     PRIM_ADD,
     PRIM_SUB,
     PRIM_ARGS,
@@ -32,8 +36,35 @@ enum {
     PRIM_LSB,
     PRIM_MSB,
     PRIM_READ,
-    PRIM_GETC
+    PRIM_GETC,
+    PRIM_RESET
 };
+
+void ls() {
+    printf("Known variables: ");
+    int i = mem[VARS];
+    while(i < mem[TOP_OF+VARS]) {
+        Variable * var = (Variable *) &memory[i];
+
+#ifdef LEXICAL_SCOPING
+        // Instead of printing "(closure)" a thousand times,
+        // print a '*' to suggest that the preceding var may have been a function.
+//        if (var->name == UQSTR_CLOSURE) { if (i != mem[VARS]) printf("*"); } else
+        if (var->name != UQSTR_CLOSURE)
+#endif
+//        printf(" %s (%d)", str(var->name), var->value);
+        printf("%s ", str(var->name));
+        i += sizeof(Variable);
+    }
+    printf("\n");
+}
+
+void strings() {
+    printf("Known strings:");
+    int i = mem[STRINGS];
+    while(memory[i] != 0) { printf(" %s", &memory[i+1]); i += memory[i]; }
+    printf("\n");
+}
 
 // Convert an integer value to a base-n string representation 
 // (for printing), stored on the temporal data stack.
@@ -128,6 +159,7 @@ uint16_t base_prim_group_cb(uint8_t prim) {
                 push(&argstack, 0); // indicate that there are zero args to the block
                 run_func(func);
                 result = pop(&argstack);
+                // Obsolete: this is for the syntax loop { test } { loop }
                 if (result != 0 && func2 != 0) {
 	            push(&argstack, 0); // indicate that there are zero args to the block
                     run_func(func2);
@@ -142,6 +174,24 @@ uint16_t base_prim_group_cb(uint8_t prim) {
         case PRIM_SET:
             temp = item(&argstack, n--);
             set_var(temp, item(&argstack, n--));
+            break;
+        case PRIM_GET:
+//            printf("in prim get\n");
+            temp = item(&argstack, n--);
+            result = get_var(temp);
+            break;
+        case PRIM_GET_AT: // (Name may be improved) Hop to var via parent references using relative indices
+//            printf("in prim get-at %d\n", n);
+            temp = mem[TOP_OF+VARS];
+            while (n > 1) {
+                temp -= item(&argstack, n--); // now we are at the (intermediate parent) variable
+                temp = ((Variable *) &memory[temp])->value; // get its pointer or end value
+//            printf("Found variable %s\n", (char*) &memory[((Variable *) &memory[temp])->name]);
+            }
+            result = temp;
+//            result = ((Variable *) &memory[temp])->value;
+//            printf("Found variable %s\n", (char*) &memory[((Variable *) &memory[temp])->name]);
+//            printf("done prim get-at\n");
             break;
         case PRIM_ADD:
             var = lookup_variable(item(&argstack, n--));
@@ -239,6 +289,16 @@ uint16_t base_prim_group_cb(uint8_t prim) {
             temp = n > 1 ? item(&argstack, n--) : 0;
             result = fgetc(temp == 1 ? readfile : stdin);
             break;
+        case PRIM_RESET:
+            for (int i=0; i<8;i++) {
+                mem[TOP_OF+i] = mem[INITIAL+TOP_OF+i];
+                n = 1;
+            }
+#ifdef ANALYZE_VARS
+            init_varstackmodel();
+#endif
+            result = 0;
+            break;
         default:
             // It is very easy to come here by triggering the
             // evaluation of a random value as a function.
@@ -265,7 +325,9 @@ void register_base_prims() {
     add_variable("if", add_primitive(group | PRIM_IF));
     add_variable("loop", add_primitive(group | PRIM_LOOP));
     add_variable("define", add_primitive(group | PRIM_DEFINE));
-    add_variable("set", add_primitive(group | PRIM_SET)); // consider: set (at "foo") 42; to re-use set as setw (or just use '=')
+    add_variable("set", add_primitive(group | PRIM_SET));
+    add_variable("get", add_primitive(group | PRIM_GET));
+    add_variable("get-at", add_primitive(group | PRIM_GET_AT));
     add_variable("add", add_primitive(group | PRIM_ADD));
     add_variable("sub", add_primitive(group | PRIM_SUB));
     add_variable("args", add_primitive(group | PRIM_ARGS));
@@ -283,4 +345,5 @@ void register_base_prims() {
     add_variable("msb", add_primitive(group | PRIM_MSB));
     add_variable("read", add_primitive(group | PRIM_READ));
     add_variable("getc", add_primitive(group | PRIM_GETC));
+    add_variable("reset", add_primitive(group | PRIM_RESET));
 }

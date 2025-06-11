@@ -1,5 +1,5 @@
-CFLAGS=-Wall -Wunused -ffunction-sections -fdata-sections -DANSI_TERM -DLEXICAL_SCOPING
-OBJS=src/stack.o src/base.o src/int.o src/pasta.o src/terminal.o src/file.o
+CFLAGS=-Wall -Wunused -ffunction-sections -fdata-sections -DANSI_TERM -DLEXICAL_SCOPING -DANALYZE_VARS
+OBJS=src/stack.o src/vars.o src/base.o src/int.o src/pasta.o src/terminal.o src/file.o
 
 EMBEDDEDS=hello.ram.obj assets/ascii1.bmp.obj assets/ascii2.bmp.obj recipes/lib.pasta.obj recipes/lib.trico.obj
 

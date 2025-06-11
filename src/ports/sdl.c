@@ -5,6 +5,7 @@
 
 #include <SDL2/SDL.h>
 
+#include "../vars.h"
 #include "../pasta.h"
 #include "../tricolore.h"
 

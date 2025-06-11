@@ -4,28 +4,24 @@
 
 #include "stack.h"
 
+extern uint16_t UQSTR_CLOSURE; // Reference to the unique string used for a closure variable
+extern uint16_t UQSTR_PARENT;  // Reference to the unique string used to point to a closure for the parent scope
+
 void run_func(uint16_t func);
-
-typedef struct __attribute__((__packed__)) Variable {
-    uint16_t name;
-    uint16_t value; // TODO do we assume all types' values fit in 16 bits?
-} Variable;
-
-Variable * add_variable(char * name, uint16_t value);
-Variable * add_var(uint16_t name, uint16_t value);
-uint16_t set_var(uint16_t name, uint16_t value);
-Variable * quiet_lookup_variable(uint16_t name);
-Variable * lookup_variable(uint16_t name);
 
 void parse(FILE * infile, bool repl);
 
 void print_asm(unsigned char * code, int code_end);
-void ls();
-void strings();
 
 extern Stack argstack;
 
 #define str(v) ((char *) &memory[v])
+
+/** 
+ * Find string in unique string list, or add it.
+ * @return relative pointer to string
+ */
+uint16_t unique_string(char * string);
 
 //
 // Primitives
@@ -52,6 +48,8 @@ enum {
 #define END_OF 1
 // so we can write e.g. mem[TOP_OF+VARS] to access the top-of-memory registers
 #define TOP_OF 8
+// and mem[INITIAL+TOP_OF+VARS] for a reset state
+#define INITIAL 8
 
 #define MAX_MEM (64 * 1024)
 

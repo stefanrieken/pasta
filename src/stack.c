@@ -14,7 +14,7 @@ uint16_t pop(Stack * stack) {
 }
 
 void push(Stack * stack, uint16_t value) {
-    if(stack->length >= stack->size) { printf("Stack overflow!\n"); return; }
+    if(stack->length >= stack->size) { printf("Stack overflow!\n"); exit(-1); }
     stack->values[stack->length] = value;
     stack->length++;
 }
@@ -35,6 +35,7 @@ void drop(Stack * stack, int n) {
 }
 
 // Bracket counting uses the stack differently:
+// TODO not used anymore?
 void bopen(Stack * stack) {
     if(stack->length >= stack->size) { printf("Stack overflow!\n"); return; }
     stack->values[stack->length] = 0;

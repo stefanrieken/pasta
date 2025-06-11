@@ -7,6 +7,7 @@
 #include "hardware/pwm.h"
 #include "hardware/clocks.h"
 
+#include "../vars.h"
 #include "../pasta.h"
 #include "../ssd1306.h"
 

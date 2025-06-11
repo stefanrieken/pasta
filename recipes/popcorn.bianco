@@ -1,3 +1,4 @@
+cls
 write screen "Popcorn!"
 
 define "true" 1;
@@ -47,7 +48,7 @@ define "play" {
             beep (* (getb notes note) oct) (* (getb rhythm i) 75);
             add "i" 1;
             #return true
-            catchup # As this is not the (GUI) main loop, interrupting by keyboard only interrupts one play sequence!
+            catchup # As this is not the (GUI) main loop, interruption by character input only interrupts one play sequence!
         }
     };
 }
@@ -61,6 +62,4 @@ loop {
     add "i" 1;
     < i 2
 }    
-
-print "done\n"
 
