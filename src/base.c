@@ -8,6 +8,7 @@
 // NOTE: this group is almost out of space! (32 max)
 enum {
     PRIM_RETURN,
+    PRIM_BIND,
     PRIM_PRINT,
     PRIM_$,
     PRIM_C,
@@ -107,6 +108,15 @@ uint16_t base_prim_group_cb(uint8_t prim) {
             // instead of accidentally evaluating it as a function
             result = item(&argstack, n--);
             break;
+        case PRIM_BIND:
+#if defined(LEXICAL_SCOPING) && !defined(AUTO_BIND)
+            result = bind(item(&argstack, n--));
+#else
+            // If we automatically bind functions, make manual `bind` a no-op
+            // Same if we don't have lexical scoping at all
+            result = item(&argstack, n--);
+#endif
+            break;
         case PRIM_PRINT:
             while(n != 1) { temp = item(&argstack, n--); printf("%s", (char *) &memory[temp]); }
             result = temp;
@@ -139,12 +149,12 @@ uint16_t base_prim_group_cb(uint8_t prim) {
             func = item(&argstack, n--);
             if(temp) {
                 push(&argstack, 0); // indicate that there are zero args to the block
-                run_func(func);
+                run_func(func, false);
                 result = pop(&argstack);
             } else if (n > 1) {
                 func2 = item(&argstack, n--);
                 push(&argstack, 0); // indicate that there are zero args to the block
-                run_func(func2);
+                run_func(func2, false);
                 result = pop(&argstack);
             } else result = 0;
             n = 1;
@@ -157,12 +167,12 @@ uint16_t base_prim_group_cb(uint8_t prim) {
             }
             do {
                 push(&argstack, 0); // indicate that there are zero args to the block
-                run_func(func);
+                run_func(func, false);
                 result = pop(&argstack);
                 // Obsolete: this is for the syntax loop { test } { loop }
                 if (result != 0 && func2 != 0) {
 	            push(&argstack, 0); // indicate that there are zero args to the block
-                    run_func(func2);
+                    run_func(func2, false);
                     pop(&argstack);
                 }
             } while(result != 0);
@@ -280,7 +290,7 @@ uint16_t base_prim_group_cb(uint8_t prim) {
             if((readfile = fopen((const char*) &memory[temp], "r"))) {
                 push(&argstack, 1); // No real file handle yet, but some differentiator from stdin 
                 push(&argstack, 1); // 1 arg
-                run_func(func);
+                run_func(func, true);
                 result = pop(&argstack);
                 fclose(readfile);
             } else printf ("bah he\n");
@@ -316,6 +326,7 @@ void register_base_prims() {
     uint8_t group = add_primitive_group(base_prim_group_cb);
 
     add_variable("return", add_primitive(group | PRIM_RETURN));
+    add_variable("bind", add_primitive(group | PRIM_BIND));
     add_variable("print", add_primitive(group | PRIM_PRINT));
     add_variable("$", add_primitive(group | PRIM_$));
     add_variable("c", add_primitive(group | PRIM_C));

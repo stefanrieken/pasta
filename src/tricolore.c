@@ -204,6 +204,8 @@ void draw(int from_x, int from_y, int width, int height) {
 
     scalex = scalex << shift; scaley = scaley << shift;
 
+    if (sprite->twidth == 0) sprite->twidth =8; // fall back to default tile width rather than division by zero
+
     if (sprite->width != 0 && sprite->height != 0) {
       int width_map = sprite->width; //(sprite->width + 7) / 8; // Even if width and height are not byte aligned, their map data is
 
@@ -238,7 +240,7 @@ void draw(int from_x, int from_y, int width, int height) {
           // Also need to get to the right line of this tile for the current pixel; add (i%8) * 16 bytes per line
           // Then we need to pick out the right byte depending on the current bit written:
           uint8_t byte_idx = ((j/scalex) % 8) < 4 ? 0 : 1;
-          uint8_t tile_data = memory[TILE_MEM + (sprite->mode & 0b11111100)*1024 + (tile_idx/8)*128+((i/scaley)%8)*16 + ((tile_idx%8))*2 + byte_idx];
+          uint8_t tile_data = memory[TILE_MEM + (sprite->mode & 0b11111100)*1024 + (tile_idx/sprite->twidth)*128+((i/scaley)%sprite->twidth)*16 + (tile_idx%sprite->twidth)*2 + byte_idx];
 
 
           int pxdata = (tile_data >> ((3-((j/scalex)%4))*2)) & 0b11;

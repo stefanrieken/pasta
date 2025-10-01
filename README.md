@@ -50,6 +50,35 @@ automatically execute, unless a '-' argument is specified.
 The desktop version of Tricolore features mouse input, and a 'hires' mode of
 256x256 pixels / 32x32 characters (as opposed to 128x128 / 16x16).
 
+### Build flags
+While not normally necessary, it is possible to tweak the build flags used in
+the Makefile / CMakeLists.txt (the latter only being used by the Pico build):
+
+- PICO_SDK tweaks C library expectations for the Pico build
+- ANSI_TERM adds arrow key support and single-line history on Unix-like terminals
+- LEXICAL_SCOPING makes callbacks skip parts of the variable stack
+- ANALYZE_VARS replaces by-name with indexed lookups where possible (WIP)
+- AUTO_BIND disables manually calling `bind` (= `lambda`) (WIP, preferred off)
+
+#### Blocks vs Function scope
+The main difference with AUTO_BIND is that the interpreter cannot differentiate
+a block scope from a function scope. This causes an excessive amount of parent
+scopes and associated indirect variable lookups.
+
+Manually distinguishing blocks from functions on the other hand is purely a
+practicality: the user must know if a random function like `foreach` expects a
+block or a full callback for its argument; and in practice only primitives and
+stateless functions can handle block arguments; and even then the latter will
+leave a parent pointer mark on the stack, which the former (normally) doesn't.
+
+As a rule then, any function taking a block argument must guarantee that it
+does not modify the stack beyond what is predicted by ANALYZE_VARS. (There is
+indeed a little more leeway with naieve variable lookup.)
+
+When using AUTO_BIND, _or_ disabling LEXICAL_SCOPING, `bind` acts as a no-op.
+This way, code written with explicit calls to `bind` will work exactly the
+same in all environments.
+
 ## For the Thumby Color
 Tricolore can be built to run on the Thumby Color. It requires a copy of the
 Pico SDK with the TinyUSB submodule to be placed alongside the Pasta folder.

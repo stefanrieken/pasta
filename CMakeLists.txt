@@ -5,6 +5,7 @@ add_compile_definitions(PICO_SDK)
 add_compile_definitions(ANSI_TERM)
 add_compile_definitions(LEXICAL_SCOPING)
 add_compile_definitions(ANALYZE_VARS)
+#add_compile_definitions(AUTO_BIND)
 pico_sdk_init()
 
 project(bianco)

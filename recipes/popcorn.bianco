@@ -21,7 +21,7 @@ setallb octave   8  8  8  8  8  8  4  0    8  8  8  8  8  8  4  0    8  8 16 16 
 setallb rhythm   2  2  2  2  2  2  2  2    2  2  2  2  1  2  2  3    2  2  2  2  1  1  2  2  2  1  1  2  2  2  2  2  2  2  2
 
 
-define "play" {
+define "play" (bind {
     args "up";
 
     define "i" 0;
@@ -51,7 +51,7 @@ define "play" {
             catchup # As this is not the (GUI) main loop, interruption by character input only interrupts one play sequence!
         }
     };
-}
+});
 
 define "i" 0;
 loop {

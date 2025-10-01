@@ -7,7 +7,9 @@
 extern uint16_t UQSTR_CLOSURE; // Reference to the unique string used for a closure variable
 extern uint16_t UQSTR_PARENT;  // Reference to the unique string used to point to a closure for the parent scope
 
-void run_func(uint16_t func);
+uint16_t bind(uint16_t value);
+
+void run_func(uint16_t func, bool is_bound);
 
 void parse(FILE * infile, bool repl);
 

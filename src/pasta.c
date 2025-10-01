@@ -73,6 +73,7 @@ uint16_t UQSTR_ARGS;
 uint16_t UQSTR_ENUM;
 uint16_t UQSTR_BITFIELD;
 uint16_t UQSTR_DEFINE;
+uint16_t UQSTR_BIND;
 
 uint16_t GLOBAL_GET;
 uint16_t GLOBAL_GET_AT;
@@ -86,7 +87,7 @@ uint16_t UQSTR_PARENT;  // Reference to the unique string used to point to a clo
 // Define closure as an anonymous variable,
 // indicating the position in the variable list at bind time
 uint16_t bind(uint16_t value) {
-    // printf("Binding %d\n", value);
+    //printf("Binding %d\n", value);
     Variable * closure = add_var(UQSTR_CLOSURE, value);
     return ((uint8_t *) closure) - memory;
 }
@@ -103,6 +104,7 @@ uint16_t add_primitive(uint16_t prim) {
     memory[mem[TOP_OF+CODE]++] = 0; // Specify type 'primitive'
     memory[mem[TOP_OF+CODE]++] = prim;
 
+// Bind primitives regardless of AUTO_BIND
 #ifdef LEXICAL_SCOPING
     return bind(mem[TOP_OF+CODE]-2);
 #else
@@ -157,16 +159,27 @@ void print_asm(unsigned char * code, int code_end) {
     }
 }
 
-void run_func(uint16_t func) {
+// Run a function OR a block.
+// is_bound:
+// - should be 'true' for any block preceded by `bind` (aka `lambda`, aka "this is a function")
+// - AUTO_BIND overrides this value; but best is to pass is_bound just like when binding is implicit
+// - dynamic scoping also renders this parameter irrelevant; again, just pass it duly anyway
+void run_func(uint16_t func, bool is_bound) {
 
 #ifdef LEXICAL_SCOPING
-    // 'func' actually points to an anonymous closure variable.
     uint16_t closure = func;
-    func = ((Variable *) &memory[func])->value;
+#ifndef AUTO_BIND
+    if (is_bound)
+#endif
+    {
+        // 'func' actually points to an anonymous closure variable.
+        func = ((Variable *) &memory[func])->value;
+    }
 #endif
 
     // Avoid interpreting zeroes and other random (but hopefully low) functions
     if (func < mem[CODE] || func > mem[TOP_OF+CODE]) { printf("Invalid function reference.\n"); return; }
+
     uint8_t type = memory[func];
     uint16_t num_args = peek(&argstack);
     uint16_t result = 0;
@@ -179,15 +192,22 @@ void run_func(uint16_t func) {
         // invoke primitive group callback
         result = prim_groups[group](prim & 0b11111);
     } else {
+        int saved_vars_top = mem[TOP_OF+VARS];
 #ifdef LEXICAL_SCOPING
-        // Start the function 'stack frame' with a variable referencing the closure,
-        // serving as a marker to skip any intermediate variables during lookup.
-        add_var(UQSTR_PARENT, closure);
+#ifndef AUTO_BIND
+        if (is_bound)
+#endif
+        {
+            // Start the function 'stack frame' with a variable referencing the closure,
+            // serving as a marker to skip any intermediate variables during lookup.
+            add_var(UQSTR_PARENT, closure);
+        }
 #endif
         // 'type' is actually a skip_code instruction
         uint16_t length = memory[func+1];
         length |= memory[func+2] << 8;
         run_code(&memory[func+3], length, false, false);
+        mem[TOP_OF+VARS] = saved_vars_top;
         result = pop(&argstack);
         // assume for now all args are taken
     }
@@ -197,11 +217,7 @@ void run_func(uint16_t func) {
 }
 
 void run_code(unsigned char * code, int length, bool toplevel, bool from_stdin) {
-#ifdef LEXICAL_SCOPING
-    int saved_vars_top = mem[TOP_OF+VARS]-sizeof(Variable); // include parent scope ref in actual start of 'frame'
-#else
-    int saved_vars_top = mem[TOP_OF+VARS];
-#endif
+//    int saved_vars_top = mem[TOP_OF+VARS];
     int saved_argstack = argstack.length;
     int saved_datastack = mem[TOP_OF+DATA];
 
@@ -225,7 +241,7 @@ void run_code(unsigned char * code, int length, bool toplevel, bool from_stdin) 
                     mem[TOP_OF+DATA] = saved_datastack;
                 } else {
                     push(&argstack, value); // push n args
-                    run_func(item(&argstack, value+1));
+                    run_func(item(&argstack, value+1), true);
                 }
                 break;
             case CMD_PUSH:
@@ -251,7 +267,7 @@ void run_code(unsigned char * code, int length, bool toplevel, bool from_stdin) 
                 break;
             case CMD_SKIP:
                 //printf("skip %d\n", value);
-#ifdef LEXICAL_SCOPING
+#if defined(LEXICAL_SCOPING) && defined(AUTO_BIND)
                 push(&argstack, bind((code-memory)+i-2));
 #else
                 push(&argstack, (code-memory)+i-2); // push start address of block
@@ -263,7 +279,7 @@ void run_code(unsigned char * code, int length, bool toplevel, bool from_stdin) 
 
     // Reset scope, argstack
     if (!toplevel) {
-        mem[TOP_OF+VARS] = saved_vars_top;
+//        mem[TOP_OF+VARS] = saved_vars_top;
         int result = pop(&argstack);
 //        if (argstack.length < saved_argstack) { printf ("TODO I suspect underflow when taking args\n"); }
         argstack.length = saved_argstack;
@@ -338,27 +354,25 @@ void generate_var_ref(uint16_t name) {
     int i=varstackmodel.length-1;
     while (i > 0 && varstackmodel.values[i] != name) {
         int16_t val = ((int16_t) (varstackmodel.values[i]));
-        if (val == 0) {
-            var_type=VAR_INTERMEDIATE;
 #ifdef LEXICAL_SCOPING
+        if (val == UQSTR_PARENT) {
+            var_type=VAR_INTERMEDIATE;
             parents[num_parents++]=i*sizeof(Variable);
             if(num_parents > 16) printf("Too much nesting\n");
-#endif
             i--;
-        } else if(val < 0) {
-            i += val;
-            printf("Skipped %d to %s\n", val,  (char *) &memory[varstackmodel.values[i]]);
-        } else i--;
+        } else
+#endif
+        i--;
     }
 
     if (i < 0 || varstackmodel.values[i] != name) { printf("Not found: %s\n", (char *) &memory[name]); return; } // var not found
     else where=i*sizeof(Variable); // 2*16 = 32 bit
 
     while (i > 0) {
-        if(varstackmodel.values[i] == 0) break;
+        if(varstackmodel.values[i] == UQSTR_PARENT) break;
         i--;
     }
-    if(varstackmodel.values[i] != 0) var_type=VAR_GLOBAL;
+    if(varstackmodel.values[i] != UQSTR_PARENT) var_type=VAR_GLOBAL;
 
     if(var_type == VAR_INTERMEDIATE) {
 //        printf("Constructing intermediate reference\n");
@@ -405,6 +419,9 @@ int parse2(FILE * infile, int until, bool repl) {
     bool in_args = false;
     bool in_define = false;
     uint16_t to_define = 0;
+#ifndef AUTO_BIND
+    bool in_bind = false;
+#endif
 #endif
 
     int ch = next_non_whitespace_char(infile, until);
@@ -455,10 +472,21 @@ int parse2(FILE * infile, int until, bool repl) {
             if (in_args) push(&varstackmodel, uqstr);
 #endif
         } else if (ch == '{') {
+// When manually binding, detect function at 'bind' to distinguish from closure
 #ifdef ANALYZE_VARS
-            push(&varstackmodel, UQSTR_CLOSURE); // Parent scope will have a closure var
+#ifndef AUTO_BIND
+            if (in_bind)
+#endif
+            {
+                push(&varstackmodel, UQSTR_CLOSURE); // Parent scope will have a closure var
+            }
             int vml = varstackmodel.length;
-            push(&varstackmodel, 0); // register scope boundary (== parent pointer)
+#ifndef AUTO_BIND
+            if (in_bind)
+#endif
+            {
+                push(&varstackmodel, UQSTR_PARENT); // register scope boundary (== parent pointer) TODO ifndef AUTO_BIND, analyze call to `bind` instead
+            }
 #endif
             int skip_from = mem[TOP_OF+CODE];
             add_command(CMD_SKIP, 0xFFFF); // Force creation of word-sized value, to be overwritten later
@@ -482,6 +510,9 @@ int parse2(FILE * infile, int until, bool repl) {
                 to_define=0;
             }
             in_args = false;
+#ifndef AUTO_BIND
+            in_bind = false;
+#endif
 #endif
         } else if (ch == '(') {
             parse2(infile, ')', repl);
@@ -498,6 +529,9 @@ int parse2(FILE * infile, int until, bool repl) {
             num_args++;
             if(num_args == 1 && (UQSTR_ARGS == uqstr || UQSTR_ENUM == uqstr || UQSTR_BITFIELD == uqstr)) { in_args = true; }
             if(num_args == 1 && UQSTR_DEFINE == uqstr) { in_define = true; }
+#ifndef AUTO_BIND
+            if(num_args == 1 && UQSTR_BIND == uqstr) { in_bind = true; }
+#endif
 #else
             add_command(CMD_REF, uqstr); // #else
             num_args++;
@@ -519,6 +553,9 @@ end:
             to_define=0;
         }
         in_args = false;
+#ifndef AUTO_BIND
+        in_bind = false;
+#endif
 #endif
 
     return ch;
@@ -607,6 +644,7 @@ void pasta_init() {
     UQSTR_ENUM = unique_string("enum");
     UQSTR_BITFIELD = unique_string("bitfield");
     UQSTR_DEFINE = unique_string("define");
+    UQSTR_BIND = unique_string("bind");
     GLOBAL_GET = lookup_variable(unique_string("get"))->value;
     GLOBAL_GET_AT = lookup_variable(unique_string("get-at"))->value;
 
@@ -689,7 +727,7 @@ void * mainloop(void * arg) {
             //printf("Running run func\n");
             push(&argstack, var->value);
             push(&argstack, 1);
-            run_func(var->value);
+            run_func(var->value, true);
             argstack.length = 0;
         } else if (i != 0) do_repl = false;
     }

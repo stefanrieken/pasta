@@ -27,16 +27,17 @@ extern bool screen_active;
 #define PLANE_BTN 0b110000
 
 
-// TODO: thought we already were cramped for space here, but we only use 10 of the 16 bytes available!
+// TODO: thought we already were cramped for space here, but we only use 13 of the 16 bytes available!
 typedef struct Sprite {
-  uint8_t x;
-  uint8_t y;
-  uint8_t width;
-  uint8_t height;
-  uint16_t map; // location of map in memory. Must be 16 bit, otherwise granularity is way off
-  uint8_t mode; // 6-bit (MSB) location of tiles (presently offset from 24k = 0x6000) + 2-bit mode
-  uint8_t flags; // msb->lsb: scaley (2b) scalex (2b), transparent (4b);
+  uint8_t x;       // x position of sprite. May read as signed integer depending on graphics mode
+  uint8_t y;       // y position of sprite. May read as signed integer depending on graphics mode
+  uint8_t width;   // Width of sprite, in tiles.
+  uint8_t height;  // Height of sprite, in tiles.
+  uint16_t map;    // Location of map in memory. Full 16-bit address, as maps can be any size / anywhere
+  uint8_t mode;    // 6-bit (MSB) location of tiles (presently offset from mem[TILES] = 0x6000) + 2-bit mode
+  uint8_t flags;   // msb->lsb: scale y (2b) scale x (2b), transparent (4b);
   uint16_t colors; // 4x index into 4-bit color palette
+  uint8_t twidth;  // Tile bank line width in bytes; normally 8
 } Sprite;
 
 // Extend start-of / top-of register

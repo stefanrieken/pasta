@@ -4,13 +4,13 @@ setallb screen_spr 0 0 32 32;
 
 define "cursor" screen;
 
-define "button" {
+define "button" (bind {
     args "text";
     set "cursor" (write cursor "\x08\x0c\x0c\x0c\x0c\x0c\x0c");
     setb cursor 0x0a; add "cursor" 1; # can't write graphical char under 'newline' value
     set "cursor" (write cursor "\n\x0d" text "\x0d\n");
     set "cursor" (write cursor "\x18\x0c\x0c\x0c\x0c\x0c\x0c\x1a\n")
-}
+})
 
 button "save  "
 button "page 0"
@@ -19,7 +19,7 @@ button "pal  \x04"
 
 define "sheet" (* 31 1024)
 define "sheet_spr" (sprite 1)
-setallb sheet_spr 64 0 8 8 (lsb sheet) (msb sheet) 0 0xA0 0x10 0x32 # set transparent=none; # default color scheme
+setallb sheet_spr 64 0 8 8 (lsb sheet) (msb sheet) 0 0xA0 0x10 0x32 8 # set transparent=none; # default color scheme
 
 # Fill the empty pages with a raster
 define "tilemem" 0x6000
@@ -39,32 +39,32 @@ loop {
 define "colorref" (+ sheet 256)
 write colorref "0"
 define "color_spr" (sprite 2)
-setallb color_spr 48 56 1 1 (lsb colorref) (msb colorref) 0 0x00 0x10 0x32
+setallb color_spr 48 56 1 1 (lsb colorref) (msb colorref) 0 0x00 0x10 0x32 8
 
 # Show the full palette as squares; this takes 4 sprites and a useful video mode
 define "palettemap" (+ colorref 1)
 setallb palettemap 0b00000000 0b01000000 0b10000000 0b11000000
 
 define "fullpalette_spr0" (sprite 3)
-setallb fullpalette_spr0 64 208 4 1 (lsb palettemap) (msb palettemap) 2 0x50 0x10 0x32
+setallb fullpalette_spr0 64 208 4 1 (lsb palettemap) (msb palettemap) 2 0x50 0x10 0x32 8
 define "fullpalette_spr1" (sprite 4)
-setallb fullpalette_spr1 128 208 4 1 (lsb palettemap) (msb palettemap) 2 0x50 0x54 0x76
+setallb fullpalette_spr1 128 208 4 1 (lsb palettemap) (msb palettemap) 2 0x50 0x54 0x76 8
 define "fullpalette_spr2" (sprite 5)
-setallb fullpalette_spr2 64 224 4 1 (lsb palettemap) (msb palettemap) 2 0x50 0x98 0xBA
+setallb fullpalette_spr2 64 224 4 1 (lsb palettemap) (msb palettemap) 2 0x50 0x98 0xBA 8
 define "fullpalette_spr3" (sprite 6)
-setallb fullpalette_spr3 128 224 4 1 (lsb palettemap) (msb palettemap) 2 0x50 0xDC 0xFE
+setallb fullpalette_spr3 128 224 4 1 (lsb palettemap) (msb palettemap) 2 0x50 0xDC 0xFE 8
 
 # Show the 4-color palettes using a similar technique (and the same map)
 define "palette_spr0" (sprite 7)
-setallb palette_spr0 0 96 4 1 (lsb palettemap) (msb palettemap) 2 0x50 0x10 0x32
+setallb palette_spr0 0 96 4 1 (lsb palettemap) (msb palettemap) 2 0x50 0x10 0x32 8
 define "palette_spr1" (sprite 8)
-setallb palette_spr1 0 112 4 1 (lsb palettemap) (msb palettemap) 2 0x50 0x54 0x76
+setallb palette_spr1 0 112 4 1 (lsb palettemap) (msb palettemap) 2 0x50 0x54 0x76 8
 define "palette_spr2" (sprite 9)
-setallb palette_spr2 0 128 4 1 (lsb palettemap) (msb palettemap) 2 0x50 0x98 0xBA
+setallb palette_spr2 0 128 4 1 (lsb palettemap) (msb palettemap) 2 0x50 0x98 0xBA 8
 define "palette_spr3" (sprite 10)
-setallb palette_spr3 0 144 4 1 (lsb palettemap) (msb palettemap) 2 0x50 0xDC 0xFE
+setallb palette_spr3 0 144 4 1 (lsb palettemap) (msb palettemap) 2 0x50 0xDC 0xFE 8
 
-define "page" {
+define "page" (bind {
     args "n";
     define "i" 0;
     loop {
@@ -74,17 +74,17 @@ define "page" {
     };
 
     draw
-}
+})
 
 page 0
 
 define "color_idx" 0b00
 
-define "adjust_colorref" {
+define "adjust_colorref" (bind {
     set_sprite_color color_spr 0 (get_sprite_color sheet_spr color_idx);
     if (= color_idx 0) { set_sprite_color color_spr 1 (get_sprite_color sheet_spr 1) }  # don't have the same background (color 0) as foreground color
     { set_sprite_color color_spr 1 0 }; # in other cases, use color 0
-}
+})
 
 loop {
     if (return click) {

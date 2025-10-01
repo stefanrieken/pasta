@@ -26,10 +26,10 @@ setb move_tile 0x13
 
 # This function maps coords so that they start at 1,
 # like a player would use them
-define "point" {
+define "point" (bind {
     args "x" "y";
     + (* (- y 1) 19) (- x 1)
-}
+})
 
 define "x" 1
 define "y" 1
@@ -90,7 +90,7 @@ draw
 
 # propagate new liberty count over fully connected shape;
 # optionally remove stones if count is zero
-define "floodfill" {
+define "floodfill" (bind {
     args "color" "value" "x" "y" "remove";
     if (&& (>= x 1) (>= y 1) (<= x 19) (<= y 19) (= (getb stones (point x y)) color) (! (= (getb liberties (point x y)) value)) ) {
         setb liberties (point x y) value;
@@ -108,10 +108,10 @@ define "floodfill" {
         floodfill color value x (+ y 1) remove;
         floodfill color value (+ x 1) y remove;
     }
-}
+})
 
 # Determine added liberty count of connected field
-define "added_value" {
+define "added_value" (bind {
     args "color" "x" "y";
     if (&& (>= x 1) (>= y 1) (<= x 19) (<= y 19)) {
         if (= color (getb stones (point x y))) {
@@ -125,9 +125,9 @@ define "added_value" {
         }
     }
     # else branches return 0
-}
+})
 
-define "play" {
+define "play" (bind {
     args "color" "x" "y";
 
     # Subtract a liberty from connected opposite stones
@@ -150,7 +150,7 @@ define "play" {
     setb move_tile opposite;
     floodfill color 0xFF x y false; # First fill with unique value to give flood fill a stop condition
     floodfill color newval x y false; # Then fill with actual value
-}
+})
 
 loop {
     if (! (&& (= (/ pointer_x 8) x) (= (/ pointer_y 8) y))) {

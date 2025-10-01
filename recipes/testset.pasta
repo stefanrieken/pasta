@@ -15,7 +15,7 @@ define "normal" "\e[0m";
 define "tests_run" 0;
 define "succeeded" 0;
 
-define "test" {
+define "test" (bind {
     args "comment" "expected" "result";
 
     add "tests_run" 1;
@@ -26,7 +26,7 @@ define "test" {
     } {
         print red comment normal "\n"
     }
-};
+});
 
 # Integer functions:
 # - At least a positive range of 0...65535

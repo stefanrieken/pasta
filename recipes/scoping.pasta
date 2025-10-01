@@ -5,14 +5,19 @@
 # This is the first found value for 'x' in case of lexical scoping.
 define "x" "lexical"
 
-define "foo" {
+define "foo" (bind {
     args "bar";
 
     # This later definition of 'x' is not skipped in case of dynamic scoping.
     define "x" "dynamic";
 
     bar
+})
+
+foo (bind { print "This Pasta interpreter is compiled with " x " scoping and " })
+
+if (= (bind 42) 42) {
+    print "automatic binding.\n" # always true for dynamic scoping
+} {
+    print "manual binding.\n"
 }
-
-foo { print "This Pasta interpreter is compiled with " x " scoping.\n" }
-

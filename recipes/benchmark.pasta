@@ -1,6 +1,6 @@
 # Run this with the `time` Unix command to profile.
 #
-# Compare builds with and without -DANALYZE_VARS
+# Compare builds with and without -DANALYZE_VARS and -DAUTO_BIND (faster without)
 #
 # Direct global var access alone should already cause a huge speed increase,
 # because every built-in function is resolved this way. Define "x" and "y" at

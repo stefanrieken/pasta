@@ -36,7 +36,7 @@ draw
 
 #bitfield "north" "east" "south" "west";
 
-define "pxtouches" {
+define "pxtouches" (bind {
     args "x" "y";
     set "x" (% x 128);
     set "y" (% y 128);
@@ -45,9 +45,9 @@ define "pxtouches" {
     define "tile" (+ (* (/ y 8) 16) (/ x 8));
     define "map" (| (<< (getb screen_spr map1) 8) (getb screen_spr map0));
     getb map tile
-};
+});
 
-define "run" {
+define "run" (bind {
     define "diffx"  0;
     define "diffy"  0;
 
@@ -146,5 +146,5 @@ define "run" {
 
         catchup
     }
-}
+})
 

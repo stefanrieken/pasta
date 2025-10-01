@@ -1,5 +1,5 @@
 # define the sprite struct
-enum "xpos" "ypos" "width" "height" "map0" "map1" "tileset" "flags" "colors0" "colors1"
+enum "xpos" "ypos" "width" "height" "map0" "map1" "tileset" "flags" "colors0" "colors1" "twidth"
 
 # Current flags:
 # - Scale y (bits 7-6)
@@ -7,10 +7,10 @@ enum "xpos" "ypos" "width" "height" "map0" "map1" "tileset" "flags" "colors0" "c
 # - Transparency (bits 3-0, on / off for each color index)
 
 # returns sprite struct n
-define "sprite" {
+define "sprite" (bind {
     args "n";
     + 0x0100 (* n 16)
-}
+})
 
 # Load base ascii / spritesets into memory (may be builtin)
 #load_bitmap "assets/ascii1.bmp"
@@ -19,14 +19,14 @@ define "sprite" {
 # Define text screen / background sprite
 define "screen_spr" (sprite 0)
 define "screen" (* 30 1024) # Location of screen data
-setallb screen_spr 0 0 16 16 (lsb screen) (msb screen) 1 0x00 0x10 0x30 # set scale=1x; default color scheme
+setallb screen_spr 0 0 16 16 (lsb screen) (msb screen) 1 0x00 0x10 0x30 8 # set scale=1x; default color scheme; 8 byte wide tiles
 
 # Define palette register
 define "palette" 0x00C0
-define "colour" {
+define "colour" (bind {
     args "n" "r" "g" "b";
     setallb (+ palette (* n 4)) b g r; # Carrying over quirks from bitmap format
-}
+})
 
 # 16 color palette
 # The first 4 colors override those loaded in with the bitmaps
@@ -51,7 +51,7 @@ colour 14 0xaa 0xc1 0x81 # Fern
 colour 15 0x69 0x7e 0x02 # Olive
 
 
-define "set_sprite_color" {
+define "set_sprite_color" (bind {
     args "sprite" "color_idx" "colornum";
     if (= color_idx 0) {
       setb sprite colors0 (| (& (getb sprite colors0) 0xF0) colornum)
@@ -65,9 +65,9 @@ define "set_sprite_color" {
     if (= color_idx 3) {
       setb sprite colors1 (| (& (getb sprite colors1) 0x0F) (<< colornum 4))
     };
-}
+})
 
-define "get_sprite_color" {
+define "get_sprite_color" (bind {
     args "sprite" "color_idx";
     define "result" 0;
     if (= color_idx 0) {
@@ -83,9 +83,9 @@ define "get_sprite_color" {
         set "result" (>> (getb sprite colors1) 4)
     };
     return result
-}
+})
 
-define "cls" {
+define "cls" (bind {
     define "i" 0;
 
     loop {
@@ -95,4 +95,4 @@ define "cls" {
     };
 
     draw
-}
+})
