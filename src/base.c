@@ -152,13 +152,15 @@ uint16_t base_prim_group_cb(uint8_t prim) {
                 push(&argstack, 0); // indicate that there are zero args to the block
                 run_func(func, false);
                 result = pop(&argstack);
-            } else if (n > 1) {
+            } else {
 		skip_arg();
-                func = next_arg();
-                push(&argstack, 0); // indicate that there are zero args to the block
-                run_func(func, false);
-                result = pop(&argstack);
-            } else result = 0;
+                if (n > 1) {
+                    func = next_arg();
+                    push(&argstack, 0); // indicate that there are zero args to the block
+                    run_func(func, false);
+                    result = pop(&argstack);
+                } else result = 0;
+            }
             break;
         case PRIM_LOOP:
             func = next_arg();
