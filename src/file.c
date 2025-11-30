@@ -88,9 +88,9 @@ uint16_t file_prim_group_cb(uint8_t prim) {
 
     switch(prim) {
         case PRIM_SAVE:
-            filename = (char *) &memory[item(&argstack, n--)];
+            filename = (char *) &memory[next_arg()];
             while (n > 1) {
-                index = item(&argstack, n--);
+                index = next_arg();
                 bitmap |= 1 << (index >> 1); // 2-byte offset
                 if (index & 0b01) append |= 1 << (index >> 1);
             }
@@ -102,9 +102,9 @@ uint16_t file_prim_group_cb(uint8_t prim) {
             result = 0;
             break;
         case PRIM_LOAD:
-            filename = (char *) &memory[item(&argstack, n--)];
+            filename = (char *) &memory[next_arg()];
             while (n > 1) {
-                index = item(&argstack, n--);
+                index = next_arg();
                 bitmap |= 1 << (index >> 1); // 2-byte offset
                 if (index & 0b01) append |= 1 << (index >> 1);
             }

@@ -27,60 +27,60 @@ enum {
 
 uint16_t int_prim_group_cb(uint8_t prim) {
     uint16_t n = peek(&argstack);
-    uint16_t result = item(&argstack, n--);
+    uint16_t result = next_arg();
         switch(prim) {
             case PRIM_PLUS:
-                while (n > 1) result += item(&argstack, n--);
+                while (n > 1) result += next_arg();
                 break;
             case PRIM_MINUS:
-                while (n > 1) result -= item(&argstack, n--);
+                while (n > 1) result -= next_arg();
                 break;
             case PRIM_TIMES:
-                while (n > 1) result *= item(&argstack, n--);
+                while (n > 1) result *= next_arg();
                 break;
             case PRIM_DIV:
-                result = result / item(&argstack, n--);
+                result = result / next_arg();
                 break;
             case PRIM_REST:
-                result = result % item(&argstack, n--);
+                result = result % next_arg();
                 break;
             case PRIM_LT:
-                result = result < item(&argstack, n--);
+                result = result < next_arg();
                 break;
             case PRIM_LTE:
-                result = result <= item(&argstack, n--);
+                result = result <= next_arg();
                 break;
             case PRIM_GT:
-                result = result > item(&argstack, n--);
+                result = result > next_arg();
                 break;
             case PRIM_GTE:
-                result = result >= item(&argstack, n--);
+                result = result >= next_arg();
                 break;
             case PRIM_EQ:
-                result = result == item(&argstack, n--);
+                result = result == next_arg();
                 break;
             case PRIM_ANDB:
-                while (n > 1) result &= item(&argstack, n--);
+                while (n > 1) result &= next_arg();
                 break;
             case PRIM_AND:
                 // Have to overcome C's laziness; eval item at argstack first
-                while (n > 1) result = item(&argstack, n--) && result;
+                while (n > 1) result = next_arg() && result;
                 break;
             case PRIM_ORB:
-                while (n > 1) result |= item(&argstack, n--);
+                while (n > 1) result |= next_arg();
                 break;
             case PRIM_OR:
                 // Have to overcome C's laziness; eval item at argstack first
-                while (n > 1) result = item(&argstack, n--) || result;
+                while (n > 1) result = next_arg() || result;
                 break;
             case PRIM_XOR:
-                while (n > 1) result ^= item(&argstack, n--);
+                while (n > 1) result ^= next_arg();
                 break;
             case PRIM_LEFT_SHIFT:
-                result = result << item(&argstack, n--);
+                result = result << next_arg();
                 break;
             case PRIM_RIGHT_SHIFT:
-                result = result >> item(&argstack, n--);
+                result = result >> next_arg();
                 break;
             default:
                 printf("Invalid primitive reference: %d\n", prim);

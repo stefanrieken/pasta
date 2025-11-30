@@ -55,10 +55,10 @@ uint16_t disp_prim_group_cb(uint8_t prim) {
 
     switch(prim) {
         case PRIM_WRITE:
-            temp = item(&argstack, n--); // target screen data location
+            temp = next_arg(); // target screen data location
             uint8_t inverse = 0;
             while (n > 1) {
-              str = item(&argstack, n--);
+              str = next_arg();
               while(memory[str] != 0) {
                 if(memory[str] == '\n') {
                   temp = (temp / (SCREEN_WIDTH >> shift)) * (SCREEN_WIDTH >> shift) + (SCREEN_WIDTH >> shift); // set cursor to new line (TODO does not compute end of screen!)
@@ -77,10 +77,10 @@ uint16_t disp_prim_group_cb(uint8_t prim) {
 // automatically fall through to draw after write
 //            break;
         case PRIM_DRAW:
-            if (n > 1) from_x = item(&argstack, n--);
-            if (n > 1) from_y = item(&argstack, n--);
-            if (n > 1) to_x = item(&argstack, n--);
-            if (n > 1) to_y = item(&argstack, n--);
+            if (n > 1) from_x = next_arg();
+            if (n > 1) from_y = next_arg();
+            if (n > 1) to_x = next_arg();
+            if (n > 1) to_y = next_arg();
             draw(from_x, from_y, to_x, to_y);
             break;
         case PRIM_CATCHUP:
@@ -101,14 +101,14 @@ uint16_t disp_prim_group_cb(uint8_t prim) {
             break;
         case PRIM_SAVE_SHEET:
             // Utility function specific to the editor
-            temp = item(&argstack, n--);
-            quickwrite_2bitmap("out.bmp", &memory[temp], (uint32_t *) &memory[item(&argstack, n--)]);
+            temp = next_arg();
+            quickwrite_2bitmap("out.bmp", &memory[temp], (uint32_t *) &memory[next_arg()]);
             break;
         case PRIM_BEEP:;
             int frequency = 440;
             int duration = 500;
-            if(n > 1) frequency = item(&argstack, n--);
-            if(n > 1) duration  = item(&argstack, n--);
+            if(n > 1) frequency = next_arg();
+            if(n > 1) duration  = next_arg();
             beep(frequency, duration);
             break;
     }

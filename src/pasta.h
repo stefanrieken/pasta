@@ -74,3 +74,8 @@ extern bool do_repl;
 // Callbacks for which Pasta expects an implementation
 //
 extern void refresh(); // Trigger state refreshes, think redrawing a screen after loading a binary
+
+// For lazy evaluation we probably need a whole new eval loop.
+// Any eager callbacks may survive the transition just by redefining this function:
+#define next_arg() (item(&argstack, n--))
+#define skip_arg() if (n > 1) { n--; }

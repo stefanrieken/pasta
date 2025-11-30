@@ -106,30 +106,30 @@ uint16_t base_prim_group_cb(uint8_t prim) {
             // May also call this 'pass', 'quote', 'ref', etc.
             // The point is to turn a lone value into an expression
             // instead of accidentally evaluating it as a function
-            result = item(&argstack, n--);
+            result = next_arg();
             break;
         case PRIM_BIND:
 #if defined(LEXICAL_SCOPING) && !defined(AUTO_BIND)
-            result = bind(item(&argstack, n--));
+            result = bind(next_arg());
 #else
             // If we automatically bind functions, make manual `bind` a no-op
             // Same if we don't have lexical scoping at all
-            result = item(&argstack, n--);
+            result = next_arg();
 #endif
             break;
         case PRIM_PRINT:
-            while(n != 1) { temp = item(&argstack, n--); printf("%s", (char *) &memory[temp]); }
+            while(n != 1) { temp = next_arg(); printf("%s", (char *) &memory[temp]); }
             result = temp;
             break;
         case PRIM_$:
-            temp = item(&argstack, n--);
-            uint16_t base = n > 1 ? item(&argstack, n--) : 10;
-            uint16_t positions = n > 1 ? item(&argstack, n--) : 0;
+            temp = next_arg();
+            uint16_t base = n > 1 ? next_arg() : 10;
+            uint16_t positions = n > 1 ? next_arg() : 0;
             result = val_to_base(temp, base, positions);
             break;
         case PRIM_C:
             result = mem[TOP_OF+DATA];
-            memory[mem[TOP_OF+DATA]++] = item(&argstack, n--);
+            memory[mem[TOP_OF+DATA]++] = next_arg();
             memory[mem[TOP_OF+DATA]++] = '\0';
             break;
         case PRIM_LS:
@@ -145,25 +145,26 @@ uint16_t base_prim_group_cb(uint8_t prim) {
             result = 0;
             break;
         case PRIM_IF:
-            temp = item(&argstack, n--);
-            func = item(&argstack, n--);
+            temp = next_arg();
             if(temp) {
+                func = next_arg();
+		skip_arg(); // discard 'else'
                 push(&argstack, 0); // indicate that there are zero args to the block
                 run_func(func, false);
                 result = pop(&argstack);
             } else if (n > 1) {
-                func2 = item(&argstack, n--);
+		skip_arg();
+                func = next_arg();
                 push(&argstack, 0); // indicate that there are zero args to the block
-                run_func(func2, false);
+                run_func(func, false);
                 result = pop(&argstack);
             } else result = 0;
-            n = 1;
             break;
         case PRIM_LOOP:
-            func = item(&argstack, n--);
+            func = next_arg();
             func2 = 0;
             if (n > 1) {
-                func2 = item(&argstack, n--);
+                func2 = next_arg();
             }
             do {
                 push(&argstack, 0); // indicate that there are zero args to the block
@@ -178,23 +179,23 @@ uint16_t base_prim_group_cb(uint8_t prim) {
             } while(result != 0);
             break;            
         case PRIM_DEFINE:
-            temp = item(&argstack, n--);
-            add_var(temp, item(&argstack, n--));
+            temp = next_arg();
+            add_var(temp, next_arg());
             break;
         case PRIM_SET:
-            temp = item(&argstack, n--);
-            set_var(temp, item(&argstack, n--));
+            temp = next_arg();
+            set_var(temp, next_arg());
             break;
         case PRIM_GET:
 //            printf("in prim get\n");
-            temp = item(&argstack, n--);
+            temp = next_arg();
             result = get_var(temp);
             break;
         case PRIM_GET_AT: // (Name may be improved) Hop to var via parent references using relative indices
 //            printf("in prim get-at %d\n", n);
             temp = mem[TOP_OF+VARS];
             while (n > 1) {
-                temp -= item(&argstack, n--); // now we are at the (intermediate parent) variable
+                temp -= next_arg(); // now we are at the (intermediate parent) variable
                 temp = ((Variable *) &memory[temp])->value; // get its pointer or end value
 //            printf("Found variable %s\n", (char*) &memory[((Variable *) &memory[temp])->name]);
             }
@@ -204,13 +205,13 @@ uint16_t base_prim_group_cb(uint8_t prim) {
 //            printf("done prim get-at\n");
             break;
         case PRIM_ADD:
-            var = lookup_variable(item(&argstack, n--));
-            var->value += item(&argstack, n--);
+            var = lookup_variable(next_arg());
+            var->value += next_arg();
             result = var->value;
             break;
         case PRIM_SUB:
-            var = lookup_variable(item(&argstack, n--));
-            var->value -= item(&argstack, n--);
+            var = lookup_variable(next_arg());
+            var->value -= next_arg();
             result = var->value;
             break;
         case PRIM_ARGS:
@@ -246,29 +247,29 @@ uint16_t base_prim_group_cb(uint8_t prim) {
             result = 0;
             break;
         case PRIM_NOT:
-            result = item(&argstack, n--);
+            result = next_arg();
             result = result ? 0 : 1;
             break;
         case PRIM_NOTB:
-            result = ~item(&argstack, n--); // Note that the resultl is 16-bit
+            result = ~next_arg(); // Note that the resultl is 16-bit
             break;
         case PRIM_GET_BYTE:
         case PRIM_GET_WORD:
-            temp = item(&argstack, n--);
-            while (n > 1) temp += item(&argstack, n--); // Allow struct indexing: getb mystruct myenum
+            temp = next_arg();
+            while (n > 1) temp += next_arg(); // Allow struct indexing: getb mystruct myenum
             result = memory[temp];
             if (prim == PRIM_GET_WORD) result |= memory[temp+1] << 8;
             break;
         case PRIM_SET_BYTE:
         case PRIM_SET_WORD:
-            temp = item(&argstack, n--);
-            while (n > 2) temp += item(&argstack, n--); // Allow struct indexing: setb mystruct myenum
-            result = item(&argstack, n--);
+            temp = next_arg();
+            while (n > 2) temp += next_arg(); // Allow struct indexing: setb mystruct myenum
+            result = next_arg();
             memory[temp] = result & 0xFF;
             if (prim == PRIM_SET_WORD) memory[temp+1] = result >> 8;
             break;
         case PRIM_SET_ALL_BYTE:
-            temp = item(&argstack, n--);
+            temp = next_arg();
             for(int i=0; i<n-1; i++) {
                 memory[temp+i] = item(&argstack, n-i);
             }
@@ -276,17 +277,17 @@ uint16_t base_prim_group_cb(uint8_t prim) {
             result = 0;
             break;
         case PRIM_MSB:
-            temp = item(&argstack, n--);
+            temp = next_arg();
             result = temp >> 8;
             break;
         case PRIM_LSB:
-            temp = item(&argstack, n--);
+            temp = next_arg();
             result = temp & 0xFF;
             break;
         case PRIM_READ: // Open a file for reading in callback
             if (n != 3) { printf("Wrong num of args to read\n"); break; }
-            temp = item(&argstack, n--);
-            func = item(&argstack, n--);
+            temp = next_arg();
+            func = next_arg();
             if((readfile = fopen((const char*) &memory[temp], "r"))) {
                 push(&argstack, 1); // No real file handle yet, but some differentiator from stdin 
                 push(&argstack, 1); // 1 arg
@@ -296,7 +297,7 @@ uint16_t base_prim_group_cb(uint8_t prim) {
             } else printf ("bah he\n");
             break;
         case PRIM_GETC:
-            temp = n > 1 ? item(&argstack, n--) : 0;
+            temp = n > 1 ? next_arg() : 0;
             result = fgetc(temp == 1 ? readfile : stdin);
             break;
         case PRIM_RESET:
