@@ -11,7 +11,7 @@ uint16_t bind(uint16_t value);
 
 void run_func(uint16_t func, bool is_bound);
 
-void parse(FILE * infile, bool repl);
+void parse_and_run(FILE * infile, bool repl);
 
 void print_asm(unsigned char * code, int code_end);
 
@@ -55,6 +55,29 @@ enum {
 
 #define MAX_MEM (64 * 1024)
 
+#ifdef ANALYZE_VARS
+extern Stack varstackmodel; // variable stack model
+extern uint16_t UQSTR_ARGS;
+extern uint16_t UQSTR_ENUM;
+extern uint16_t UQSTR_BITFIELD;
+extern uint16_t UQSTR_DEFINE;
+extern uint16_t UQSTR_BIND;
+
+extern uint16_t GLOBAL_GET;
+extern uint16_t GLOBAL_GET_AT;
+#endif
+
+#define CMD_EVAL 0b00
+#define CMD_PUSH 0b01
+#define CMD_REF  0b10
+#define CMD_SKIP 0b11
+
+#define BYTE_FOLLOWS 0b111101
+#define WORD_FOLLOWS 0b111110
+#define LONG_FOLLOWS 0b111111
+
+void run_code(unsigned char * code, int length, bool toplevel, bool from_stdin);
+int parse(FILE * infile, int until, bool repl);
 
 // Wrapper so that implementations can select between using
 // fopen (where files are separate) or fmemopen (where files are linked in).

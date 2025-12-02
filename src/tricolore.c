@@ -172,7 +172,7 @@ void tricolore_init() {
     // Load Pasta + Tricolore libs
     FILE * infile;
     if ((infile = open_file("recipes/lib.trico", "rb"))) {
-        parse(infile, true);
+        parse_and_run(infile, true);
         fclose(infile);
     }
 

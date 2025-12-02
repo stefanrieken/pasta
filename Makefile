@@ -1,5 +1,5 @@
 CFLAGS=-Wall -Wunused -ffunction-sections -fdata-sections -DANSI_TERM -DLEXICAL_SCOPING -DANALYZE_VARS #-DAUTO_BIND
-OBJS=src/stack.o src/vars.o src/base.o src/int.o src/pasta.o src/terminal.o src/file.o
+OBJS=src/stack.o src/vars.o src/base.o src/int.o src/pasta.o src/parse.o src/terminal.o src/file.o
 
 EMBEDDEDS=hello.ram.obj assets/ascii1.bmp.obj assets/ascii2.bmp.obj recipes/lib.pasta.obj recipes/lib.trico.obj
 
@@ -36,15 +36,22 @@ rp2040: rp2040/Makefile src/*.c src/ports/thumby.c $(EMBEDDEDS)
 
 rp2040/Makefile: CMakeLists.txt
 	mkdir -p rp2040
-	cd rp2040 && cmake .. -DPICO_PLATFORM=rp2040 -DPICOTOOL_FETCH_FROM_GIT_PATH=$(realpath ../picotool)
+	cd rp2040 && cmake .. -DPICO_PLATFORM=rp2040 -DPICOTOOL_FETCH_FROM_GIT_PATH=$(realpath ../pico/picotool)
 
 
 rp2350: rp2350/Makefile $(OBJS) src/*.c src/ports/thumby_color.c $(EMBEDDEDS)
 	cd rp2350 && make tricolore
 
+rp2350-riscv/Makefile: CMakeLists.txt
+	mkdir -p rp2350-riscv
+	cd rp2350-riscv && cmake .. -DPICO_PLATFORM=rp2350-riscv -DPICOTOOL_FETCH_FROM_GIT_PATH=$(realpath ../pico/picotool)
+
+rp2350-riscv: rp2350-riscv/Makefile $(OBJS) src/*.c src/ports/thumby_color.c $(EMBEDDEDS)
+	cd rp2350-riscv && make tricolore
+
 rp2350/Makefile: CMakeLists.txt
 	mkdir -p rp2350
-	cd rp2350 && cmake .. -DPICO_PLATFORM=rp2350 -DPICOTOOL_FETCH_FROM_GIT_PATH=$(realpath ../picotool)
+	cd rp2350 && cmake .. -DPICO_PLATFORM=rp2350 -DPICOTOOL_FETCH_FROM_GIT_PATH=$(realpath ../pico/picotool)
 
 clean:
-	rm -rf src/*.o src/ports/*.o pasta tricolore tricolore_gtk rp2040 rp2350 assets/*.obj recipes/*.obj
+	rm -rf src/*.o src/ports/*.o pasta tricolore tricolore_gtk rp2040 rp2350 assets/*.obj recipes/*.obj hello.ram
