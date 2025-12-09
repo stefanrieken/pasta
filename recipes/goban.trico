@@ -90,7 +90,9 @@ draw
 
 # propagate new liberty count over fully connected shape;
 # optionally remove stones if count is zero
-define "floodfill" (bind {
+
+define "floodfill" 0 # placeholder so that recursive calls can find the variable even in lexical scoping
+set "floodfill" (bind {
     args "color" "value" "x" "y" "remove";
     if (&& (>= x 1) (>= y 1) (<= x 19) (<= y 19) (= (getb stones (point x y)) color) (! (= (getb liberties (point x y)) value)) ) {
         setb liberties (point x y) value;
