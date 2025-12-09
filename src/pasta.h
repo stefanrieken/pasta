@@ -98,6 +98,8 @@ extern bool do_repl;
 //
 extern void refresh(); // Trigger state refreshes, think redrawing a screen after loading a binary
 
+extern PrimGroupCb prim_groups[];
+
 // For lazy evaluation we probably need a whole new eval loop.
 // Any eager callbacks may survive the transition just by redefining this function:
 #define next_arg() (item(&argstack, n--))

@@ -9,7 +9,7 @@ add_compile_definitions(ANALYZE_VARS)
 pico_sdk_init()
 
 project(bianco)
-add_executable(bianco src/terminal.c src/vars.c src/pasta.c src/parse.c src/stack.c src/base.c src/int.c src/file.c src/ports/thumby.c src/ssd1306.c)
+add_executable(bianco src/terminal.c src/vars.c src/pasta.c src/parse.c src/run.c src/stack.c src/base.c src/int.c src/file.c src/ports/thumby.c src/ssd1306.c)
 target_link_libraries(bianco pico_stdlib hardware_pwm hardware_spi ${CMAKE_CURRENT_SOURCE_DIR}/recipes/lib.pasta.obj)
 pico_enable_stdio_usb(bianco 1)
 pico_enable_stdio_uart(bianco 0)
