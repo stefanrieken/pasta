@@ -173,6 +173,7 @@ int parse(FILE * infile, int until, bool repl) {
 #ifdef ANALYZE_VARS
     bool in_args = false;
     bool in_define = false;
+    bool in_namespace=false;
     uint16_t to_define = 0;
 #ifndef AUTO_BIND
     bool in_bind = false;
@@ -230,14 +231,14 @@ int parse(FILE * infile, int until, bool repl) {
 // When manually binding, detect function at 'bind' to distinguish from closure
 #ifdef ANALYZE_VARS
 #ifndef AUTO_BIND
-            if (in_bind)
+            if (in_bind || in_namespace)
 #endif
             {
                 push(&varstackmodel, UQSTR_CLOSURE); // Parent scope will have a closure var
             }
             int vml = varstackmodel.length;
 #ifndef AUTO_BIND
-            if (in_bind)
+            if (in_bind || in_namespace)
 #endif
             {
                 push(&varstackmodel, UQSTR_PARENT); // register scope boundary (== parent pointer) TODO ifndef AUTO_BIND, analyze call to `bind` instead
@@ -252,7 +253,7 @@ int parse(FILE * infile, int until, bool repl) {
             num_args++;
 #ifdef ANALYZE_VARS
             varstackmodel.length = vml; // Done parsing block == done analyzing block
-//            push(&varstackmodel, UQSTR_CLOSURE); // Do leave closure
+            if (in_namespace) push(&varstackmodel, UQSTR_PARENT);
 #endif
         } else if (ch == ';') {
             add_command(CMD_EVAL, num_args);
@@ -267,6 +268,7 @@ int parse(FILE * infile, int until, bool repl) {
             in_args = false;
 #ifndef AUTO_BIND
             in_bind = false;
+            in_namespace = false;
 #endif
 #endif
         } else if (ch == '(') {
@@ -286,6 +288,7 @@ int parse(FILE * infile, int until, bool repl) {
             if(num_args == 1 && UQSTR_DEFINE == uqstr) { in_define = true; }
 #ifndef AUTO_BIND
             if(num_args == 1 && UQSTR_BIND == uqstr) { in_bind = true; }
+            if(num_args == 1 && UQSTR_NAMESPACE == uqstr) { in_namespace = true; }
 #endif
 #else
             add_command(CMD_REF, uqstr); // #else

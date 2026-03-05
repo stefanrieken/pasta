@@ -62,6 +62,7 @@ extern uint16_t UQSTR_ENUM;
 extern uint16_t UQSTR_BITFIELD;
 extern uint16_t UQSTR_DEFINE;
 extern uint16_t UQSTR_BIND;
+extern uint16_t UQSTR_NAMESPACE;
 
 extern uint16_t GLOBAL_GET;
 extern uint16_t GLOBAL_GET_AT;

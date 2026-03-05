@@ -183,6 +183,7 @@ uint16_t base_prim_group_cb(uint8_t prim) {
         case PRIM_NAMESPACE:
             func = next_arg();
             func2 = bind(func); // maybe not strictly necessary, but parent pointer does form a natural end boundary
+            add_var(UQSTR_PARENT, func2); // but then we still want to reference our lexical scope from within, no?
             // Now just run_func without cleaning up
             uint16_t length = memory[func+1];
             length |= memory[func+2] << 8;

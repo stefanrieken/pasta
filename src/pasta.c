@@ -60,6 +60,7 @@ uint16_t UQSTR_ENUM;
 uint16_t UQSTR_BITFIELD;
 uint16_t UQSTR_DEFINE;
 uint16_t UQSTR_BIND;
+uint16_t UQSTR_NAMESPACE;
 
 uint16_t GLOBAL_GET;
 uint16_t GLOBAL_GET_AT;
@@ -203,6 +204,7 @@ void pasta_init() {
     UQSTR_BITFIELD = unique_string("bitfield");
     UQSTR_DEFINE = unique_string("define");
     UQSTR_BIND = unique_string("bind");
+    UQSTR_NAMESPACE = unique_string("namespace");
     GLOBAL_GET = lookup_variable(unique_string("get"))->value;
     GLOBAL_GET_AT = lookup_variable(unique_string("get-at"))->value;
 
