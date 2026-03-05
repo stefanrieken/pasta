@@ -96,7 +96,7 @@ set "floodfill" (bind {
     args "color" "value" "x" "y" "remove";
     if (&& (>= x 1) (>= y 1) (<= x 19) (<= y 19) (= (getb stones (point x y)) color) (! (= (getb liberties (point x y)) value)) ) {
         setb liberties (point x y) value;
-        if (& (return remove) (= value 0)) {
+        if (& remove (= value 0)) {
             setb stones (point x y) 0; # capture
             # increase liberties of surrounding groups
             define "opposite" (if (= color 0x13) { return 0x0b } { return 0x13 });
@@ -162,9 +162,9 @@ loop {
 
         draw;
     };
-    if (return click) {
+    if click {
         set "click" 0;
-        if (&& (>= x 1) (>= x 1) (<= x 19) (<= y 19)) {
+        if (&& (>= x 1) (>= x 1) (<= x 19) (<= y 19) (= 0 (getb stones (point x y)))) {
             #setb stones (point x y) (getb move_tile);
             play (getb move_tile) x y;
             setb move_spr width 0;

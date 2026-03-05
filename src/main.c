@@ -13,4 +13,5 @@ void refresh() {
 int main (int argc, char ** argv) {
     pasta_init();
     mainloop(&argv[1]);
+    //printf("Top of code: %d\n", mem[TOP_OF+CODE]-mem[CODE]);
 }

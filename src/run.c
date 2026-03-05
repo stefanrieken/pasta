@@ -14,32 +14,13 @@
 #include "file.h"
 
 // Run a function OR a block.
-//
-// is_bound:
-// - should be 'true' for any block preceded by `bind` (aka `lambda`, aka "this is a function")
-// - AUTO_BIND overrides this value; but best is to pass is_bound just like when binding is implicit
-// - dynamic scoping also renders this parameter irrelevant; again, just pass it duly anyway
 void run_func(uint16_t func, bool is_bound) {
-
-#ifdef LEXICAL_SCOPING
-    uint16_t closure = func;
-#ifndef AUTO_BIND
-    if (is_bound)
-#endif
-    {
-        // 'func' actually points to an anonymous closure variable.
-        func = ((Variable *) &memory[func])->value;
-    }
-#endif
-
-    // Avoid interpreting zeroes and other random (but hopefully low) functions
-    if (func < mem[CODE] || func > mem[TOP_OF+CODE]) { printf("Invalid function reference.\n"); return; }
-
     uint8_t type = memory[func];
     uint16_t num_args = peek(&argstack);
     uint16_t result = 0;
 
     if (type == 0) { // signals primitive func
+        if (func < mem[CODE] || func > mem[TOP_OF+CODE]) { printf("Invalid (primitive) function reference.\n"); return; }
         uint8_t prim = memory[func+1];
         uint8_t group = (prim >> 5) & 0b111;
         // Final sanity check
@@ -53,11 +34,16 @@ void run_func(uint16_t func, bool is_bound) {
         if (is_bound)
 #endif
         {
+            if (func < mem[VARS] || func > mem[TOP_OF+VARS]) { printf("Invalid (closure) function reference. %x %x\n", func, mem[VARS]); return; }
+            uint16_t closure = func;
+            // 'func' actually points to an anonymous closure variable.
+            func = ((Variable *) &memory[func])->value;
             // Start the function 'stack frame' with a variable referencing the closure,
             // serving as a marker to skip any intermediate variables during lookup.
             add_var(UQSTR_PARENT, closure);
         }
 #endif
+        if (func < mem[CODE] || func > mem[TOP_OF+CODE]) { printf("Invalid (native) function reference.\n"); return; }
         // 'type' is actually a skip_code instruction
         uint16_t length = memory[func+1];
         length |= memory[func+2] << 8;

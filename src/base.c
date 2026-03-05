@@ -5,7 +5,7 @@
 #include "vars.h"
 
 // Base primitive defs
-// NOTE: this group is almost out of space! (32 max)
+// NOTE: this group is out of space! (32 max)
 enum {
     PRIM_RETURN,
     PRIM_BIND,
@@ -17,6 +17,7 @@ enum {
     PRIM_CODE,
     PRIM_IF,
     PRIM_LOOP,
+    PRIM_NAMESPACE,
     PRIM_DEFINE,
     PRIM_SET,
     PRIM_GET,
@@ -24,7 +25,6 @@ enum {
     PRIM_ADD,
     PRIM_SUB,
     PRIM_ARGS,
-    PRIM_REMAINDER,
     PRIM_ENUM,
     PRIM_BITFIELD,
     PRIM_NOT,
@@ -179,14 +179,27 @@ uint16_t base_prim_group_cb(uint8_t prim) {
                     pop(&argstack);
                 }
             } while(result != 0);
-            break;            
+            break;
+        case PRIM_NAMESPACE:
+            func = next_arg();
+            func2 = bind(func); // maybe not strictly necessary, but parent pointer does form a natural end boundary
+            // Now just run_func without cleaning up
+            uint16_t length = memory[func+1];
+            length |= memory[func+2] << 8;
+            run_code(&memory[func+3], length, false, false);
+            result = pop(&argstack);
+            add_var(UQSTR_PARENT, func2); // hide namespace behind parent pointer. TODO this breaks var stack analysis
+//            result=mem[TOP_OF+VARS]; // return reference to namespace
+            break;
         case PRIM_DEFINE:
             temp = next_arg();
-            add_var(temp, next_arg());
+            result = next_arg();
+            add_var(temp, result);
             break;
         case PRIM_SET:
             temp = next_arg();
-            set_var(temp, next_arg());
+            result = next_arg();
+            set_var(temp, result);
             break;
         case PRIM_GET:
 //            printf("in prim get\n");
@@ -199,12 +212,8 @@ uint16_t base_prim_group_cb(uint8_t prim) {
             while (n > 1) {
                 temp -= next_arg(); // now we are at the (intermediate parent) variable
                 temp = ((Variable *) &memory[temp])->value; // get its pointer or end value
-//            printf("Found variable %s\n", (char*) &memory[((Variable *) &memory[temp])->name]);
             }
             result = temp;
-//            result = ((Variable *) &memory[temp])->value;
-//            printf("Found variable %s\n", (char*) &memory[((Variable *) &memory[temp])->name]);
-//            printf("done prim get-at\n");
             break;
         case PRIM_ADD:
             var = lookup_variable(next_arg());
@@ -228,6 +237,7 @@ uint16_t base_prim_group_cb(uint8_t prim) {
             n = 1;
             result = 0;
             break;
+/*
         case PRIM_REMAINDER:
             // Any remaining args are now on the argstack like so:
             // remaining1 remaining2 named1 named2 num_args prim_remainder n
@@ -238,6 +248,7 @@ uint16_t base_prim_group_cb(uint8_t prim) {
             // the right count at the right place; also, stack values are temporal.
             printf("TODO work out arrays & use for remainder args\n");
             break;
+*/
         case PRIM_ENUM:                
             for (int i=0; i<n-1;i++) add_var(item(&argstack, n-i), i);
             n = 1;
@@ -338,6 +349,7 @@ void register_base_prims() {
     add_variable("code", add_primitive(group | PRIM_CODE));
     add_variable("if", add_primitive(group | PRIM_IF));
     add_variable("loop", add_primitive(group | PRIM_LOOP));
+    add_variable("namespace", add_primitive(group | PRIM_NAMESPACE));
     add_variable("define", add_primitive(group | PRIM_DEFINE));
     add_variable("set", add_primitive(group | PRIM_SET));
     add_variable("get", add_primitive(group | PRIM_GET));
@@ -345,7 +357,7 @@ void register_base_prims() {
     add_variable("add", add_primitive(group | PRIM_ADD));
     add_variable("sub", add_primitive(group | PRIM_SUB));
     add_variable("args", add_primitive(group | PRIM_ARGS));
-    add_variable("remainder", add_primitive(group | PRIM_REMAINDER));
+//    add_variable("remainder", add_primitive(group | PRIM_REMAINDER));
     add_variable("enum", add_primitive(group | PRIM_ENUM));
     add_variable("bitfield", add_primitive(group | PRIM_BITFIELD));
     add_variable("!", add_primitive(group | PRIM_NOT));

@@ -1,0 +1,36 @@
+# Namespace demo
+
+# A namespace is a separate chunk of stack memory.
+# With careful stack planning it can be stowed just before the parent pointer,
+# so essentially between stack frames; but without careful planning, we
+#just skip over the namespace by means of an extra parent pointer.
+
+# As a result, disable var stack analysis for this demo to (currently) work.
+
+# What we do here is essentially "let over lambda" on the stack, except that the
+# classic LOL is a bit of a dirty trick that Common LISP makes look good because
+# it isn't obvious that it modifies a parent scope. (LOL in Scheme makes this
+# painfully clear.)
+
+# Only returning one result function keeps this cleaner, but also less useful.
+# We should be able to cleanly return more than one function by wrapping them
+# inside another namespace, and returning that by way of an object; however,
+# then we (still) need a way to retrieve the object's items, and this is yet TODO.
+
+# The beauty of realizing all of this on the stack is that these objects are
+# still governed by normal scope rules. If we ever want to return an existing
+# namespace as a result value, we have a bit more work to do to prevent the
+# forward reference from disappearing with the callee's scope.
+
+define "lol" (namespace {
+    define "x" 39;
+    bind {
+      print ($ (set "x" (+ x 1))) "\n";
+      return x
+    }
+})
+
+lol
+lol
+lol
+

@@ -91,11 +91,11 @@ uint16_t add_primitive(uint16_t prim) {
     memory[mem[TOP_OF+CODE]++] = prim;
 
 // Bind primitives regardless of AUTO_BIND
-#ifdef LEXICAL_SCOPING
-    return bind(mem[TOP_OF+CODE]-2);
-#else
+//#ifdef LEXICAL_SCOPING
+//    return bind(mem[TOP_OF+CODE]-2);
+//#else
     return mem[TOP_OF+CODE]-2;
-#endif
+//#endif
 }
 
 //
